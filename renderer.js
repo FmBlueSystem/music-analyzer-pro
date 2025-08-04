@@ -810,77 +810,7 @@ async function runBatchAnalysis(files, type) {
     await loadFilesSimple();
 }
 
-// 🧠 Función para análisis LLM
-async function runLLMAnalysis(files) {
-    // REMOVED: Placeholder implementation
-    throw new Error('LLM analysis must be implemented with real functionality');
-}
 
-// 🧠 Función para análisis LLM masivo
-async function runBatchLLMAnalysis() {
-    try {
-        console.log('🚀 Iniciando análisis LLM masivo...');
-        
-        if (audioFiles.length === 0) {
-            alert('No hay archivos para analizar. Por favor carga archivos primero.');
-            return;
-        }
-        
-        document.getElementById('status').textContent = `🧠 Analizando ${audioFiles.length} archivos...`;
-        
-        let completed = 0;
-        let errors = 0;
-        
-        // Procesar archivos en lotes pequeños para evitar sobrecarga
-        const batchSize = 3;
-        for (let i = 0; i < audioFiles.length; i += batchSize) {
-            const batch = audioFiles.slice(i, i + batchSize);
-            
-            // Procesar lote actual
-            const promises = batch.map(async (file) => {
-                try {
-                    console.log(`🧠 Analizando ${file.file_name}...`);
-                    const result = await ipcRenderer.invoke('analyze-llm', file.file_path);
-                    
-                    if (result.success) {
-                        completed++;
-                        console.log(`✅ Completado: ${file.file_name}`);
-                    } else {
-                        errors++;
-                        console.error(`❌ Error: ${file.file_name} - ${result.error}`);
-                    }
-                } catch (error) {
-                    errors++;
-                    console.error(`❌ Error procesando ${file.file_name}:`, error);
-                }
-            });
-            
-            // Esperar que termine el lote actual
-            await Promise.all(promises);
-            
-            // Actualizar progreso
-            const progress = Math.round(((i + batch.length) / audioFiles.length) * 100);
-            document.getElementById('status').textContent = 
-                `🧠 Progreso: ${completed}/${audioFiles.length} (${progress}%) - Errores: ${errors}`;
-            
-            // Pausa pequeña entre lotes para no sobrecargar
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-        
-        // Resultado final
-        document.getElementById('status').textContent = 
-            `✅ Análisis completado: ${completed} éxitos, ${errors} errores`;
-        
-        console.log(`🎉 Análisis LLM masivo completado: ${completed} éxitos, ${errors} errores`);
-        
-        // Recargar datos para mostrar resultados
-        await loadExistingFiles();
-        
-    } catch (error) {
-        console.error('❌ Error en análisis LLM masivo:', error);
-        document.getElementById('status').textContent = '❌ Error en análisis masivo';
-    }
-}
 
 // Función para mostrar estadísticas de base de datos
 window.showDatabaseCounts = async function() {

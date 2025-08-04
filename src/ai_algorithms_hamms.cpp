@@ -178,9 +178,57 @@ float HAMMSAnalyzer::calculateRhythmicRegularity(const OnsetVector& onsets) {
 }
 
 float HAMMSAnalyzer::analyzeSyncopation(const BeatVector& beats) {
-    // Placeholder for syncopation analysis
-    return 0.5f;
+    if (beats.beatTimes.size() < 3) return 0.0f;
+    
+    // Calculate average beat interval
+    std::vector<float> intervals;
+    for (size_t i = 1; i < beats.beatTimes.size(); ++i) {
+        intervals.push_back(beats.beatTimes[i] - beats.beatTimes[i-1]);
+    }
+    
+    float avgInterval = std::accumulate(intervals.begin(), intervals.end(), 0.0f) / intervals.size();
+    float intervalStdDev = 0.0f;
+    
+    // Calculate standard deviation
+    for (float interval : intervals) {
+        intervalStdDev += std::pow(interval - avgInterval, 2);
+    }
+    intervalStdDev = std::sqrt(intervalStdDev / intervals.size());
+    
+    // Detect syncopation patterns
+    int syncopatedBeats = 0;
+    int totalStrongBeats = 0;
+    
+    for (size_t i = 0; i < beats.beatTimes.size(); ++i) {
+        // Calculate beat position within measure (assuming 4/4)
+        float measurePosition = fmod(beats.beatTimes[i] / (avgInterval * 4), 1.0f);
+        
+        // Strong beats typically fall on 1 and 3 (0.0 and 0.5 in normalized measure)
+        bool isStrongPosition = (measurePosition < 0.1f || 
+                                (measurePosition > 0.45f && measurePosition < 0.55f));
+        
+        // Check if this is actually a weak beat based on strength
+        if (beats.strengths[i] > 0.7f) {
+            totalStrongBeats++;
+            
+            // Syncopation: strong accent on weak position
+            if (!isStrongPosition) {
+                syncopatedBeats++;
+            }
+        }
+    }
+    
+    // Calculate syncopation score
+    float syncopationRatio = totalStrongBeats > 0 ? 
+        static_cast<float>(syncopatedBeats) / totalStrongBeats : 0.0f;
+    
+    // Factor in rhythm regularity (more irregular = more syncopated feel)
+    float regularityFactor = 1.0f - std::exp(-intervalStdDev / avgInterval);
+    
+    // Combine factors
+    return std::min(1.0f, syncopationRatio * 0.7f + regularityFactor * 0.3f);
 }
+
 
 // Timbral Analysis
 float HAMMSAnalyzer::analyzeTimbrality(const AudioBuffer& audio) {
