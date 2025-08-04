@@ -2,6 +2,8 @@
 
 #include "ai_algorithms.h"
 #include <iostream>
+#include <cmath>
+#include <algorithm>
 
 namespace MusicAnalysis {
 
@@ -31,6 +33,7 @@ void AIMetadataAnalyzer::initializeAnalyzers() {
     confidenceCalculator = std::make_unique<ConfidenceCalculator>();
     genreClassifier = std::make_unique<GenreClassifier>();
     moodAnalyzer = std::make_unique<MoodAnalyzer>();
+    hammsAnalyzer = std::make_unique<HAMMSAnalyzer>(); // HAMMS analysis now active
 }
 
 AIAnalysisResult AIMetadataAnalyzer::combineResults(const AudioBuffer& audio) {
@@ -106,6 +109,18 @@ AIAnalysisResult AIMetadataAnalyzer::combineResults(const AudioBuffer& audio) {
             std::cout << occasion << " ";
         }
         std::cout << std::endl;
+        
+        // HAMMS Analysis
+        result.HAMMS_VECTOR = hammsAnalyzer->calculateHAMMS(audio);
+        
+        std::cout << "🎯 HAMMS Vector: " << std::endl;
+        std::cout << "  Harmonicity: " << result.HAMMS_VECTOR.harmonicity << std::endl;
+        std::cout << "  Melodicity: " << result.HAMMS_VECTOR.melodicity << std::endl;
+        std::cout << "  Rhythmicity: " << result.HAMMS_VECTOR.rhythmicity << std::endl;
+        std::cout << "  Timbrality: " << result.HAMMS_VECTOR.timbrality << std::endl;
+        std::cout << "  Dynamics: " << result.HAMMS_VECTOR.dynamics << std::endl;
+        std::cout << "  Tonality: " << result.HAMMS_VECTOR.tonality << std::endl;
+        std::cout << "  Temporality: " << result.HAMMS_VECTOR.temporality << std::endl;
         
         // Final confidence calculation
         result.AI_CONFIDENCE = confidenceCalculator->calculateOverallConfidence(audio, result);

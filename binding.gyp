@@ -4,12 +4,15 @@
       "target_name": "metadata_addon",
       "sources": [
         "src/addon_napi.cpp",
-        "../src-tauri/cpp/metadata_handler.cpp",
-        "src/ai_algorithms_master.cpp"
+        "src/ai_algorithms_master.cpp",
+        "src/ai_algorithms.cpp",
+        "src/ai_algorithms_part2.cpp",
+        "src/ai_algorithms_part3.cpp",
+        "src/ai_algorithms_base.cpp",
+        "src/ai_algorithms_hamms.cpp"
       ],
       "include_dirs": [
         "<!@(node -p \"require('node-addon-api').include\")",
-        "../src-tauri/cpp",
         "src",
         "/usr/local/include/taglib",
         "/opt/homebrew/include/taglib",

@@ -7,45 +7,80 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="app-container">
-        <!-- Header -->
-        <header class="app-header">
-            <h1>🎵 Music Analyzer Pro</h1>
-            <div class="header-controls">
-                <button id="folderBtn" class="btn btn-primary">📁 Seleccionar Carpeta</button>
-                <button id="analyzeLLMBtn" class="btn btn-success">🧠 Analizar LLM Todos</button>
-                <button id="cleanDataBtn" class="btn btn-warning">🔧 Limpiar Duplicados</button>
-                <button id="statsBtn" class="btn btn-secondary">📊 Estadísticas</button>
-                <span id="status" class="status">Listo para analizar</span>
+    <div class="app-container mac13">
+        <!-- Header Compacto -->
+        <header class="header-compact">
+            <div class="title-section">
+                <h1>🎵 Music Analyzer Pro</h1>
+                <div class="api-status-compact">
+                    <span class="status-dot"></span>
+                    <span id="status">Sistema Listo</span>
+                </div>
+            </div>
+            <div class="main-controls">
+                <button id="folderBtn" class="btn-compact btn-primary" onclick="loadFilesSimple()">📁 Cargar Archivos</button>
+                <button id="analyzeLLMBtn" class="btn-compact btn-success" onclick="showAnalysisMenu()">🧠 Analizar Todo</button>
+                <button id="statsBtn" class="btn-compact btn-secondary">📊 Estadísticas</button>
             </div>
         </header>
 
         <!-- Main Content -->
         <main class="main-content">
             <!-- Navigation Tabs -->
-            <nav class="tab-nav">
-                <button class="tab-btn active" data-tab="biblioteca">📚 Biblioteca</button>
-                <button class="tab-btn" data-tab="analisis">🔬 Análisis</button>
-                <button class="tab-btn" data-tab="hamms">🎯 HAMMS</button>
-                <button class="tab-btn" data-tab="sistema">⚙️ Sistema</button>
+            <nav class="tab-navigation">
+                <button class="tab-btn active" data-tab="biblioteca" onclick="switchTab('biblioteca')">📚 Biblioteca</button>
+                <button class="tab-btn" data-tab="analisis" onclick="switchTab('analisis')">🔬 Análisis</button>
+                <button class="tab-btn" data-tab="hamms" onclick="switchTab('hamms')">🎯 HAMMS</button>
+                <button class="tab-btn" data-tab="sistema" onclick="switchTab('sistema')">⚙️ Sistema</button>
             </nav>
 
             <!-- Biblioteca Tab -->
-            <div id="biblioteca" class="tab-content active">
-                <!-- View Toggle -->
-                <div id="viewToggle" class="view-toggle" style="display: none;">
-                    <button class="toggle-btn" data-view="cards">🎴 Tarjetas</button>
-                    <button class="toggle-btn active" data-view="table">📊 Tabla</button>
-                </div>
+            <div id="biblioteca-tab" class="tab-content active">
+                <div class="content-area">
+                    <!-- Search and Filter Controls -->
+                    <div class="search-filter-bar">
+                        <div class="search-section">
+                            <input type="text" id="searchInput" class="search-input" placeholder="🔍 Buscar por nombre, artista, BPM, género..." onkeyup="filterFiles()">
+                            <select id="filterStatus" class="filter-select" onchange="filterFiles()">
+                                <option value="all">Todos los archivos</option>
+                                <option value="pending">⏳ Sin analizar</option>
+                                <option value="partial">🔄 Análisis parcial</option>
+                                <option value="complete">✅ Completados</option>
+                            </select>
+                            <select id="filterAlgorithm" class="filter-select" onchange="filterFiles()">
+                                <option value="all">Todos los algoritmos</option>
+                                <option value="missing-bpm">Falta BPM</option>
+                                <option value="missing-key">Falta Key</option>
+                                <option value="missing-energy">Falta Energy</option>
+                                <option value="missing-mood">Falta Mood</option>
+                                <option value="missing-danceability">Falta Danceability</option>
+                            </select>
+                        </div>
+                        <div class="view-controls">
+                            <button class="btn-compact btn-view-mode active" data-view="cards" onclick="toggleViewMode()">
+                                🎴 Tarjetas
+                            </button>
+                            <button class="btn-compact btn-view-mode" data-view="table" onclick="toggleViewMode()">
+                                📊 Tabla
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- File Stats Bar -->
+                    <div class="file-stats-bar">
+                        <div class="file-count-badge" id="fileCount">0 archivos</div>
+                        <div class="file-count-badge pending" id="pendingCount">0 pendientes</div>
+                        <div class="file-count-badge partial" id="partialCount">0 parciales</div>
+                        <div class="file-count-badge complete" id="completeCount">0 completos</div>
+                    </div>
 
-                <!-- Cards View -->
-                <div id="cardsView" class="cards-view" style="display: none;">
-                    <div id="filesGrid" class="files-grid"></div>
-                </div>
+                    <!-- Files Container (for both cards and table) -->
+                    <div id="filesContainer" class="files-container">
+                        <!-- Dynamic content will be rendered here -->
+                    </div>
 
-                <!-- Table View -->
-                <div id="tableView" class="table-view">
-                    <div class="table-container-compact">
+                    <!-- Table View (hidden by default) -->
+                    <div id="tableView" class="table-container-compact" style="display: none;">
                         <table class="compact-table">
                             <thead>
                                 <tr>
@@ -70,7 +105,7 @@
             </div>
 
             <!-- Analysis Tab -->
-            <div id="analisis" class="tab-content">
+            <div id="analisis-tab" class="tab-content">
                 <div class="analysis-cards">
                     <div class="analysis-card">
                         <h3>🚀 Analizar Toda la Biblioteca</h3>
@@ -86,13 +121,13 @@
             </div>
 
             <!-- HAMMS Tab -->
-            <div id="hamms" class="tab-content">
+            <div id="hamms-tab" class="tab-content">
                 <h2>🎯 HAMMS - Sistema de Similitud Musical</h2>
                 <p>Vectores de 7 dimensiones para análisis de similitud avanzado</p>
             </div>
 
             <!-- Sistema Tab -->
-            <div id="sistema" class="tab-content">
+            <div id="sistema-tab" class="tab-content">
                 <div class="system-stats">
                     <h2>⚙️ Estadísticas del Sistema</h2>
                     <div class="stats-grid">
@@ -112,6 +147,23 @@
                 </div>
             </div>
         </main>
+    </div>
+    
+    <!-- Modal para detalles del archivo -->
+    <div id="fileDetailsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalFileName">Detalles del Archivo</h2>
+                <button class="modal-close" onclick="closeFileDetails()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Content will be populated dynamically -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn-compact btn-primary" id="analyzeSelectedBtn">🤖 Analizar Algoritmos Faltantes</button>
+                <button class="btn-compact btn-secondary" onclick="closeFileDetails()">Cerrar</button>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -914,5 +966,53 @@ ${counts.extensionBreakdown.map(ext => `${ext.file_extension}: ${ext.count.toLoc
             }
         });
     </script>
+
+    <!-- Modal de Progreso de Análisis -->
+    <div id="batch-progress-modal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <h2>🚀 Análisis en Progreso</h2>
+            
+            <div class="progress-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Archivos procesados:</span>
+                    <span id="files-processed" class="stat-value">0</span> / <span id="files-total" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Tiempo transcurrido:</span>
+                    <span id="time-elapsed" class="stat-value">00:00</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Tiempo estimado:</span>
+                    <span id="time-remaining" class="stat-value">Calculando...</span>
+                </div>
+            </div>
+
+            <div class="progress-bar-container">
+                <div class="progress-bar">
+                    <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;">
+                        <span id="progress-percentage" class="progress-percentage">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="current-file">
+                <span class="current-label">Procesando:</span>
+                <span id="current-file-name" class="current-name">-</span>
+            </div>
+
+            <div class="progress-log" id="progress-log">
+                <!-- Log entries will be added here -->
+            </div>
+
+            <div class="modal-buttons">
+                <button id="cancel-batch" class="btn btn-secondary" onclick="cancelBatchAnalysis()">
+                    ❌ Cancelar
+                </button>
+                <button id="close-progress" class="btn btn-primary" style="display: none;" onclick="closeBatchProgress()">
+                    ✅ Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

@@ -22,17 +22,9 @@ public:
     
     void Execute() override {
         try {
-            // For now, create a simple test audio buffer
-            // In a real implementation, you would load the actual audio file
-            std::vector<float> testSamples(44100, 0.5f);  // 1 second of test audio
-            AudioBuffer audio(testSamples, 44100, 2);
-            
-            // Create analyzer and run analysis
-            AIMetadataAnalyzer analyzer;
-            result = analyzer.analyzeAudio(audio);
-            
-            // Mark as successful
-            result.AI_ANALYZED = true;
+            // REMOVED: Test audio buffer generation
+            // Real audio loading must be implemented
+            throw std::runtime_error("Real audio file loading not implemented. Cannot use test data.");
             
         } catch (const std::exception& e) {
             SetError(e.what());

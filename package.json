@@ -1,24 +1,109 @@
 {
   "name": "music-analyzer-electron",
-  "version": "1.0.0",
+  "version": "2.2.0",
   "description": "Desktop app to analyze music files with LLM",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "build-addon": "node-gyp rebuild",
-    "install-addon": "npm install nan node-gyp && npm run build-addon"
+    "install-addon": "npm install nan node-gyp && npm run build-addon",
+    "dist": "npm run build-addon && electron-builder",
+    "dist:mac": "npm run build-addon && electron-builder --mac",
+    "dist:win": "npm run build-addon && electron-builder --win",
+    "dist:linux": "npm run build-addon && electron-builder --linux"
   },
   "devDependencies": {
     "electron": "^28.3.3",
+    "electron-builder": "^26.0.12",
     "node-gyp": "^10.3.1"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.57.0",
+    "dotenv": "^17.2.1",
     "flac-metadata": "^0.1.1",
     "music-metadata": "^11.7.3",
     "node-addon-api": "^7.0.0",
     "node-id3": "^0.2.9",
     "sqlite3": "^5.1.7"
+  },
+  "build": {
+    "appId": "com.musicanalyzer.pro",
+    "productName": "Music Analyzer Pro",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!**/*.ts",
+      "!src/*",
+      "!test_audio/*",
+      "!node_modules/**/src/*",
+      "!.env",
+      "!.env.example",
+      "!*.log",
+      "!*.db*"
+    ],
+    "extraResources": [
+      {
+        "from": "build/Release/metadata_addon.node",
+        "to": "build/Release/metadata_addon.node"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.icns"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "category": "Audio",
+      "icon": "assets"
+    }
   }
 }

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const NodeID3 = require('node-id3');
 const { execSync } = require('child_process');
+// Removed ffmpeg dependencies for better cross-platform compatibility
 
 class MetadataWriter {
     constructor(cppAddon = null) {
@@ -265,7 +266,7 @@ class MetadataWriter {
                 console.log(`🎵 Procesando MP3: ${path.basename(filePath)}`);
                 return await this.writeToMP3(filePath, llmMetadata, existing);
             } else if (['.flac', '.ogg'].includes(ext)) {
-                console.log(`🎼 FLAC/OGG no implementado: ${path.basename(filePath)}`);
+                console.log(`🎼 Procesando ${ext.toUpperCase()}: ${path.basename(filePath)}`);
                 return await this.writeToVorbis(filePath, llmMetadata, existing);
             } else if (ext === '.m4a') {
                 console.log(`🎶 M4A no implementado: ${path.basename(filePath)}`);
@@ -428,7 +429,7 @@ class MetadataWriter {
     }
 
     /**
-     * 🎵 Escribir metadatos a archivos Vorbis (FLAC/OGG) - Placeholder
+     * 🎵 Escribir metadatos a archivos Vorbis (FLAC/OGG)
      * @param {string} filePath - Ruta del archivo
      * @param {Object} llmMetadata - Metadatos LLM
      * @param {Object} existing - Metadatos existentes
@@ -439,12 +440,13 @@ class MetadataWriter {
         
         if (ext === '.flac') {
             return await this.writeToFLAC(filePath, llmMetadata, existing);
+        } else if (ext === '.ogg') {
+            return await this.writeToOGG(filePath, llmMetadata, existing);
         } else {
-            // OGG no implementado aún
             return {
                 success: false,
-                error: 'Escritura a OGG no implementada aún. Usando fallback JSON.',
-                method: 'ogg_not_implemented'
+                error: `Formato Vorbis no soportado: ${ext}`,
+                method: 'vorbis_unsupported'
             };
         }
     }
@@ -589,6 +591,108 @@ class MetadataWriter {
                 success: false,
                 error: error.message,
                 method: 'flac_direct_error'
+            };
+        }
+    }
+    
+    /**
+     * 🎶 Escribir metadatos a archivo OGG usando vorbiscomment
+     * @param {string} filePath - Ruta del archivo OGG
+     * @param {Object} llmMetadata - Metadatos LLM
+     * @param {Object} existing - Metadatos existentes
+     * @returns {Object} Resultado
+     */
+    async writeToOGG(filePath, llmMetadata, existing) {
+        try {
+            // 1. Verificar que vorbiscomment esté disponible
+            try {
+                execSync('which vorbiscomment', { stdio: 'ignore' });
+            } catch (whichError) {
+                console.warn('⚠️ vorbiscomment no encontrado, intentando con ogginfo/vorbiscomment alternativo');
+                // En algunos sistemas viene como parte de vorbis-tools
+                try {
+                    execSync('which ogginfo', { stdio: 'ignore' });
+                } catch (oggError) {
+                    return {
+                        success: false,
+                        error: 'vorbiscomment no está instalado. Por favor instala vorbis-tools.',
+                        method: 'ogg_vorbiscomment_not_found'
+                    };
+                }
+            }
+            
+            // 2. Preparar los Vorbis comments (mismo formato que FLAC)
+            const vorbisComments = this.prepareVorbisComments(llmMetadata, existing);
+            
+            if (vorbisComments.length === 0) {
+                return {
+                    success: false,
+                    error: 'No hay metadatos LLM para escribir',
+                    method: 'ogg_no_metadata'
+                };
+            }
+            
+            // 3. Crear archivo temporal con los comentarios
+            const tempCommentsFile = filePath + '.comments.txt';
+            const commentsContent = vorbisComments.join('\n');
+            fs.writeFileSync(tempCommentsFile, commentsContent, 'utf8');
+            
+            // 4. Crear copia de seguridad
+            const tempFile = filePath + '.tmp';
+            fs.copyFileSync(filePath, tempFile);
+            
+            try {
+                // 5. Aplicar los comentarios al archivo OGG
+                // -w = write mode (sobrescribe todos los comentarios)
+                // -c = read comments from file
+                const command = `vorbiscomment -w -c "${tempCommentsFile}" "${filePath}" "${filePath}.new"`;
+                execSync(command, { stdio: 'ignore' });
+                
+                // 6. Verificar que el archivo nuevo se creó correctamente
+                if (!fs.existsSync(filePath + '.new')) {
+                    throw new Error('No se pudo crear el archivo OGG con nuevos metadatos');
+                }
+                
+                // 7. Reemplazar el archivo original con el nuevo
+                fs.unlinkSync(filePath);
+                fs.renameSync(filePath + '.new', filePath);
+                
+                // 8. Limpiar archivos temporales
+                fs.unlinkSync(tempFile);
+                fs.unlinkSync(tempCommentsFile);
+                
+                console.log(`✅ ${vorbisComments.length} Vorbis comments escritos en OGG: ${path.basename(filePath)}`);
+                
+                return {
+                    success: true,
+                    method: 'ogg_vorbiscomment',
+                    fieldsWritten: vorbisComments.length,
+                    preservedFields: existing.preservation.shouldPreserve ? ['BPM', 'INITIALKEY'] : [],
+                    message: `✅ Metadatos escritos en OGG con vorbiscomment`
+                };
+                
+            } catch (vorbisError) {
+                // Restaurar archivo original si algo falla
+                if (fs.existsSync(tempFile)) {
+                    fs.copyFileSync(tempFile, filePath);
+                    fs.unlinkSync(tempFile);
+                }
+                if (fs.existsSync(tempCommentsFile)) {
+                    fs.unlinkSync(tempCommentsFile);
+                }
+                if (fs.existsSync(filePath + '.new')) {
+                    fs.unlinkSync(filePath + '.new');
+                }
+                
+                throw vorbisError;
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error escribiendo metadatos OGG en ${filePath}:`, error);
+            return {
+                success: false,
+                error: error.message,
+                method: 'ogg_write_error'
             };
         }
     }
@@ -901,11 +1005,19 @@ class MetadataWriter {
      * @returns {Object} Resultado
      */
     async writeToMP4(filePath, llmMetadata, existing) {
-        // TODO: Implementar escritura para MP4/M4A usando iTunes tags
+        // M4A/MP4 metadata writing requires platform-specific tools
+        // For cross-platform compatibility, using JSON sidecar files
+        console.log(`🎶 M4A detectado: ${path.basename(filePath)}`);
+        console.log(`⚠️ Escritura directa a M4A requiere herramientas específicas del SO`);
+        console.log(`📄 Usando archivo JSON sidecar para almacenar metadatos`);
+        
+        // Write to JSON sidecar instead
+        const jsonResult = await this.writeToJSON(filePath, llmMetadata, existing);
+        
         return {
-            success: false,
-            error: 'Escritura a MP4/M4A no implementada aún. Usando fallback JSON.',
-            method: 'mp4_not_implemented'
+            ...jsonResult,
+            warning: 'M4A metadata stored in JSON sidecar for cross-platform compatibility',
+            recommendation: 'Use native tools like iTunes (Mac), Windows Media Player (Windows), or AtomicParsley if direct M4A writing is needed'
         };
     }
 

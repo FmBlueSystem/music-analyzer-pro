@@ -6,6 +6,21 @@ const MetadataWriter = require('./metadata-writer');
 const MusicDatabase = require('./database');
 const CacheService = require('./cache-service');
 
+// Load environment variables
+require('dotenv').config();
+
+// Calculate SHA-256 hash of file
+async function calculateFileHash(filePath) {
+    return new Promise((resolve, reject) => {
+        const hash = crypto.createHash('sha256');
+        const stream = fs.createReadStream(filePath);
+        
+        stream.on('data', data => hash.update(data));
+        stream.on('end', () => resolve(hash.digest('hex')));
+        stream.on('error', reject);
+    });
+}
+
 // Initialize all systems
 let metadataAddon = null;
 let metadataWriter = null;
@@ -34,18 +49,15 @@ async function initializeSystems() {
     }
 }
 
-// TEMPORARILY DISABLE C++ ENGINE DUE TO CRASH ISSUES
 // Try to load the metadata addon (optional)
 try {
-    // metadataAddon = require('./build/Release/metadata_addon');
-    // console.log('✅ High-performance C++ engine loaded');
-    console.log('🔧 C++ engine temporarily disabled - using JavaScript fallback');
-    metadataAddon = null;
+    metadataAddon = require('./build/Release/metadata_addon');
+    console.log('✅ High-performance C++ engine loaded');
 } catch (error) {
-    // Silent fallback to JavaScript - this is expected behavior
-    if (process.env.NODE_ENV === 'development') {
-        console.log('🔧 Development mode: Using JavaScript engine');
-    }
+    // Fallback to JavaScript if C++ addon not available
+    console.log('🔧 C++ engine not available - using JavaScript fallback');
+    console.log('Error loading C++ addon:', error.message);
+    metadataAddon = null;
 }
 
 let mainWindow;
@@ -173,7 +185,44 @@ async function scanAndPopulateFolder(folderPath) {
             // SIMPLIFICADO: Solo obtener información básica del archivo
             const stats = fs.statSync(filePath);
             
-            // Preparar datos mínimos para base de datos (SIN ANÁLISIS)
+            // Leer metadatos reales del archivo
+            let metadata = {};
+            try {
+                const mm = await metadataWriter.musicMetadata.parseFile(filePath);
+                metadata = {
+                    title: mm.common.title || file.replace(ext, ''),
+                    artist: mm.common.artist || mm.common.albumartist || 'Unknown',
+                    album: mm.common.album || 'Unknown',
+                    genre: mm.common.genre ? mm.common.genre.join(', ') : 'Unknown',
+                    year: mm.common.year || null,
+                    duration: mm.format.duration || 0,
+                    bitrate: mm.format.bitrate || 0,
+                    sampleRate: mm.format.sampleRate || 0,
+                    channels: mm.format.numberOfChannels || 0
+                };
+                
+                // Detectar Mixed In Key
+                const mixedInKeyData = metadataWriter.detectMixedInKey(mm);
+                metadata.mixedInKeyDetected = mixedInKeyData.detected;
+                metadata.existingBpm = mixedInKeyData.bpm;
+                metadata.existingKey = mixedInKeyData.key;
+                metadata.preservationSource = mixedInKeyData.source;
+                metadata.shouldPreserve = mixedInKeyData.detected;
+            } catch (metadataError) {
+                console.warn(`⚠️ No se pudieron leer metadatos de ${file}:`, metadataError.message);
+                metadata = {
+                    title: file.replace(ext, ''),
+                    artist: 'Unknown',
+                    album: 'Unknown',
+                    genre: 'Unknown',
+                    year: null
+                };
+            }
+            
+            // Calcular hash real del archivo
+            const fileHash = await calculateFileHash(filePath);
+            
+            // Preparar datos para base de datos con metadatos reales
             const fileData = {
                 filePath: filePath,
                 fileName: file,
@@ -181,17 +230,21 @@ async function scanAndPopulateFolder(folderPath) {
                 fileExtension: ext,
                 dateModified: stats.mtime.toISOString(),
                 folderPath: path.dirname(filePath),
-                title: file.replace(ext, ''), // Usar nombre de archivo como título
-                artist: 'Unknown',
-                album: 'Unknown',
-                genre: 'Unknown',
-                year: null,
-                mixedInKeyDetected: false,
-                existingBpm: null,
-                existingKey: null,
-                preservationSource: 'none',
-                shouldPreserve: false,
-                fileHash: 'temp-hash' // Hash temporal
+                title: metadata.title,
+                artist: metadata.artist,
+                album: metadata.album,
+                genre: metadata.genre,
+                year: metadata.year,
+                duration: metadata.duration,
+                bitrate: metadata.bitrate,
+                sampleRate: metadata.sampleRate,
+                channels: metadata.channels,
+                mixedInKeyDetected: metadata.mixedInKeyDetected || false,
+                existingBpm: metadata.existingBpm || null,
+                existingKey: metadata.existingKey || null,
+                preservationSource: metadata.preservationSource || 'none',
+                shouldPreserve: metadata.shouldPreserve || false,
+                fileHash: fileHash
             };
             
             // Insertar en base de datos
@@ -633,124 +686,13 @@ ipcMain.handle('analyze-file-with-algorithms', async (event, filePath, algorithm
                     algorithmsProcessed: algorithms.length
                 };
             } catch (cppError) {
-                console.warn(`⚠️ Error en análisis C++: ${cppError.message}`);
-                // Continuar con fallback JavaScript
+                console.error(`❌ Error en análisis C++: ${cppError.message}`);
+                throw new Error(`C++ analysis failed: ${cppError.message}`);
             }
+        } else {
+            throw new Error('C++ addon not available. Please rebuild with: npx node-gyp rebuild');
         }
         
-        // Fallback: Análisis simulado en JavaScript
-        console.log(`🔧 Usando análisis JavaScript para ${path.basename(filePath)}`);
-        
-        // Simular resultados de algoritmos
-        const mockResults = {};
-        algorithms.forEach(algorithm => {
-            switch (algorithm) {
-                case 'AI_BPM':
-                    mockResults[algorithm] = Math.floor(Math.random() * 60) + 80; // 80-140 BPM
-                    break;
-                case 'AI_ENERGY':
-                    mockResults[algorithm] = Math.round(Math.random() * 100) / 100; // 0.00-1.00
-                    break;
-                case 'AI_DANCEABILITY':
-                    mockResults[algorithm] = Math.round(Math.random() * 100) / 100;
-                    break;
-                case 'AI_VALENCE':
-                    mockResults[algorithm] = Math.round(Math.random() * 100) / 100;
-                    break;
-                case 'AI_LOUDNESS':
-                    mockResults[algorithm] = Math.round((Math.random() * 20 - 25) * 100) / 100; // -25 to -5 dB
-                    break;
-                case 'AI_ACOUSTICNESS':
-                    mockResults[algorithm] = Math.round(Math.random() * 100) / 100;
-                    break;
-                case 'AI_INSTRUMENTALNESS':
-                    mockResults[algorithm] = Math.round(Math.random() * 100) / 100;
-                    break;
-                case 'AI_SPEECHINESS':
-                    mockResults[algorithm] = Math.round(Math.random() * 100) / 100;
-                    break;
-                case 'AI_LIVENESS':
-                    mockResults[algorithm] = Math.round(Math.random() * 100) / 100;
-                    break;
-                case 'AI_MOOD':
-                    const moods = ['Energetic', 'Calm', 'Happy', 'Melancholic', 'Aggressive', 'Relaxed'];
-                    mockResults[algorithm] = moods[Math.floor(Math.random() * moods.length)];
-                    break;
-                case 'AI_KEY':
-                    const keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-                    mockResults[algorithm] = keys[Math.floor(Math.random() * keys.length)];
-                    break;
-                case 'AI_MODE':
-                    mockResults[algorithm] = Math.random() > 0.5 ? 'Major' : 'Minor';
-                    break;
-                case 'AI_SUBGENRES':
-                    const genres = ['House', 'Techno', 'Trance', 'Pop', 'Rock', 'Jazz', 'Classical'];
-                    mockResults[algorithm] = [genres[Math.floor(Math.random() * genres.length)]];
-                    break;
-                case 'AI_ERA':
-                    const eras = ['1980s', '1990s', '2000s', '2010s', '2020s'];
-                    mockResults[algorithm] = eras[Math.floor(Math.random() * eras.length)];
-                    break;
-                case 'AI_CULTURAL_CONTEXT':
-                    const contexts = ['Western Pop', 'Electronic Dance', 'Alternative Rock', 'World Music'];
-                    mockResults[algorithm] = contexts[Math.floor(Math.random() * contexts.length)];
-                    break;
-                case 'AI_OCCASION':
-                    const occasions = ['Party', 'Workout', 'Study', 'Relaxation', 'Driving'];
-                    mockResults[algorithm] = [occasions[Math.floor(Math.random() * occasions.length)]];
-                    break;
-                case 'AI_CONFIDENCE':
-                    mockResults[algorithm] = Math.round((Math.random() * 0.3 + 0.7) * 100) / 100; // 0.70-1.00
-                    break;
-                default:
-                    mockResults[algorithm] = Math.round(Math.random() * 100) / 100;
-            }
-        });
-        
-        // Simular tiempo de procesamiento
-        await new Promise(resolve => setTimeout(resolve, Math.random() * 800 + 200)); // 200-1000ms
-        
-        // CRITICAL: Save results to database AND write to audio file
-        try {
-            // Find the file in database
-            const dbFile = await database.getQuery('SELECT id FROM audio_files WHERE file_path = ?', [filePath]);
-            
-            if (dbFile) {
-                // 1. Save LLM metadata results to database
-                await database.insertLLMMetadata(dbFile.id, mockResults);
-                console.log(`💾 Results saved to database for ${path.basename(filePath)}`);
-                
-                // 2. Write metadata directly to audio file
-                try {
-                    if (metadataWriter) {
-                        const writeResult = await metadataWriter.writeLLMMetadataSafe(filePath, mockResults, true);
-                        if (writeResult.success) {
-                            console.log(`🎵 Metadata written to audio file: ${path.basename(filePath)}`);
-                        } else {
-                            console.warn(`⚠️ Could not write to audio file: ${writeResult.error}`);
-                        }
-                    }
-                } catch (fileWriteError) {
-                    console.error(`❌ Error writing to audio file:`, fileWriteError);
-                    // Don't fail if file writing fails - database save is more important
-                }
-                
-                // 3. Invalidate cache to force refresh
-                cache.invalidateFile(filePath);
-            } else {
-                console.warn(`⚠️ File not found in database: ${filePath}`);
-            }
-        } catch (saveError) {
-            console.error(`❌ Error saving analysis results:`, saveError);
-            // Don't fail the entire analysis if database save fails
-        }
-        
-        return {
-            success: true,
-            engine: 'javascript',
-            results: mockResults,
-            algorithmsProcessed: algorithms.length
-        };
         
     } catch (error) {
         console.error(`❌ Error analizando ${path.basename(filePath)}:`, error);
@@ -879,7 +821,10 @@ ipcMain.handle('analyze-llm', async (event, filePath) => {
 ⚠️ ANTES DE RESPONDER: VALIDA que todos los valores numéricos sean coherentes entre sí. Si hay inconsistencias, ajusta los valores para mantener coherencia musical.`;
 
         // Call Claude API
-        const apiKey = process.env.CLAUDE_API_KEY || 'your-claude-api-key-here';
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey || apiKey === 'your-claude-api-key-here') {
+            throw new Error('API key not configured. Please set ANTHROPIC_API_KEY in your .env file');
+        }
         
         const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -902,9 +847,7 @@ ipcMain.handle('analyze-llm', async (event, filePath) => {
             const errorText = await claudeResponse.text();
             console.error('❌ Claude API Error:', claudeResponse.status, claudeResponse.statusText);
             console.error('❌ Error details:', errorText);
-            console.warn('⚠️ Claude API no disponible, usando análisis simulado');
-            // Fallback to simulated LLM analysis
-            return generateMockLLMAnalysis(filePath, fileMetadata);
+            throw new Error(`Claude API error: ${claudeResponse.status} ${claudeResponse.statusText}. Please check your API key.`);
         }
 
         const claudeData = await claudeResponse.json();
@@ -953,280 +896,14 @@ ipcMain.handle('analyze-llm', async (event, filePath) => {
     } catch (error) {
         console.error(`❌ Error en análisis LLM:`, error);
         
-        // Fallback to simulated analysis on error
-        try {
-            return generateMockLLMAnalysis(filePath, null);
-        } catch (fallbackError) {
-            return {
-                success: false,
-                error: error.message
-            };
-        }
+        return {
+            success: false,
+            error: error.message
+        };
     }
 });
 
-// 🧠 Helper function for coherent mock LLM analysis with cross-validation
-function generateMockLLMAnalysis(filePath, fileMetadata) {
-    const fileName = path.basename(filePath);
-    
-    // 🎯 GENERACIÓN COHERENTE BASADA EN ANÁLISIS DEL NOMBRE DE ARCHIVO
-    let baseGenre = 'Electronic';
-    let baseContext = '2000s Electronic';
-    let baseMood = 'Energetic';
-    let baseEnergy = 0.7;
-    let baseDanceability = 0.7;
-    let baseValence = 0.6;
-    
-    // 🔍 Detección inteligente basada en metadatos existentes y nombre de archivo
-    const lowerFileName = fileName.toLowerCase();
-    const existingGenre = fileMetadata?.metadata?.genre?.toLowerCase() || '';
-    const artistName = fileMetadata?.metadata?.artist?.toLowerCase() || '';
-    
-    // Lógica de detección de género y contexto
-    if (lowerFileName.includes('house') || lowerFileName.includes('club') || existingGenre.includes('house')) {
-        baseGenre = 'House';
-        baseContext = '90s Deep House';
-        baseMood = 'Energetic';
-        baseEnergy = 0.85;
-        baseDanceability = 0.9;
-        baseValence = 0.8;
-    } else if (lowerFileName.includes('techno') || lowerFileName.includes('minimal') || existingGenre.includes('techno')) {
-        baseGenre = 'Techno';
-        baseContext = 'Detroit Techno';
-        baseMood = 'Energetic';
-        baseEnergy = 0.9;
-        baseDanceability = 0.85;
-        baseValence = 0.6;
-    } else if (lowerFileName.includes('trance') || lowerFileName.includes('progressive') || existingGenre.includes('trance')) {
-        baseGenre = 'Trance';
-        baseContext = '90s Progressive Trance';
-        baseMood = 'Euphoric';
-        baseEnergy = 0.9;
-        baseDanceability = 0.8;
-        baseValence = 0.9;
-    } else if (lowerFileName.includes('ambient') || lowerFileName.includes('chill') || existingGenre.includes('ambient')) {
-        baseGenre = 'Ambient';
-        baseContext = 'Modern Ambient';
-        baseMood = 'Calm';
-        baseEnergy = 0.2;
-        baseDanceability = 0.1;
-        baseValence = 0.5;
-    } else if (lowerFileName.includes('rock') || lowerFileName.includes('metal') || existingGenre.includes('rock')) {
-        baseGenre = 'Rock';
-        baseContext = '90s Alternative Rock';
-        baseMood = 'Aggressive';
-        baseEnergy = 0.8;
-        baseDanceability = 0.4;
-        baseValence = 0.5;
-    } else if (lowerFileName.includes('pop') || artistName.includes('pop') || existingGenre.includes('pop')) {
-        baseGenre = 'Pop';
-        baseContext = 'Modern Pop';
-        baseMood = 'Happy';
-        baseEnergy = 0.7;
-        baseDanceability = 0.8;
-        baseValence = 0.8;
-    }
-    
-    // 🎲 Pequeñas variaciones aleatorias manteniendo coherencia
-    const energyVariation = (Math.random() - 0.5) * 0.2; // ±0.1
-    const finalEnergy = Math.max(0.1, Math.min(0.9, baseEnergy + energyVariation));
-    
-    // Coherencia: danceability debe seguir a energy
-    const finalDanceability = Math.max(0.1, Math.min(0.9, baseDanceability + energyVariation * 0.8));
-    
-    // Coherencia: valence debe coincidir con mood
-    let finalValence = baseValence;
-    if (baseMood === 'Happy' || baseMood === 'Euphoric') finalValence = Math.max(0.6, baseValence);
-    if (baseMood === 'Melancholic' || baseMood === 'Dark') finalValence = Math.min(0.4, baseValence);
-    
-    // 🎵 Generar contexto cultural específico (no genérico)
-    const specificContexts = {
-        'House': ['90s Chicago House', '2000s French House', 'UK Deep House', '90s Italian House'],
-        'Techno': ['Detroit Techno', 'Berlin Techno', '90s Minimal Techno', 'Industrial Techno'],
-        'Trance': ['90s Goa Trance', 'Dutch Progressive Trance', 'Balearic Trance', 'Uplifting Trance'],
-        'Electronic': ['90s Breakbeat', 'UK Garage', '2000s Electro House', 'French Electro'],
-        'Pop': ['80s Synthpop', '90s Eurodance', '2000s Dance Pop', 'Modern Pop'],
-        'Rock': ['90s Grunge', 'British Rock', '80s New Wave', 'Alternative Rock'],
-        'Ambient': ['Dark Ambient', 'Drone Ambient', 'Space Ambient', 'Organic Ambient']
-    };
-    
-    const contextOptions = specificContexts[baseGenre] || ['Modern Electronic'];
-    const finalContext = contextOptions[Math.floor(Math.random() * contextOptions.length)];
-    
-    // 🎼 Generar subgéneros coherentes con el género principal
-    const coherentSubgenres = {
-        'House': [['Deep House', 'Progressive House'], ['Tech House', 'Funky House'], ['Tribal House', 'Vocal House']],
-        'Techno': [['Minimal Techno', 'Deep Techno'], ['Hard Techno', 'Industrial'], ['Detroit', 'Dub Techno']],
-        'Trance': [['Progressive Trance', 'Uplifting'], ['Psytrance', 'Goa'], ['Vocal Trance', 'Balearic']],
-        'Electronic': [['Breakbeat', 'Big Beat'], ['Electro', 'Synthwave'], ['IDM', 'Glitch']],
-        'Pop': [['Dance Pop', 'Synthpop'], ['Teen Pop', 'Europop'], ['Indie Pop', 'Electropop']],
-        'Rock': [['Alternative Rock', 'Indie Rock'], ['Grunge', 'Post-Rock'], ['New Wave', 'Britpop']],
-        'Ambient': [['Dark Ambient', 'Drone'], ['Space Ambient', 'Field Recording'], ['Organic', 'Minimal']]
-    };
-    
-    const subgenreOptions = coherentSubgenres[baseGenre] || [['Electronic', 'Experimental']];
-    const selectedSubgenres = subgenreOptions[Math.floor(Math.random() * subgenreOptions.length)];
-    
-    // 🎪 Ocasiones coherentes con género y energía
-    let occasionsByEnergyAndGenre;
-    if (finalEnergy > 0.7) {
-        occasionsByEnergyAndGenre = ['Party', 'Club', 'Workout', 'Festival', 'Dancing'];
-    } else if (finalEnergy > 0.4) {
-        occasionsByEnergyAndGenre = ['Driving', 'Background', 'Social', 'Casual', 'Work'];
-    } else {
-        occasionsByEnergyAndGenre = ['Study', 'Relaxation', 'Meditation', 'Sleep', 'Chill'];
-    }
-    
-    const finalOccasions = occasionsByEnergyAndGenre
-        .sort(() => 0.5 - Math.random())
-        .slice(0, 2);
-    
-    // 🎨 Características coherentes con análisis completo
-    const characteristicsByGenre = {
-        'House': ['Four-on-the-floor', 'Repetitive', 'Bass-driven', 'Hypnotic', 'Groove-oriented'],
-        'Techno': ['Mechanical', 'Repetitive', 'Bass-heavy', 'Industrial', 'Rhythmic'],
-        'Trance': ['Uplifting', 'Progressive', 'Melodic', 'Euphoric', 'Build-ups'],
-        'Electronic': ['Synthetic', 'Digital', 'Experimental', 'Layered', 'Processed'],
-        'Pop': ['Catchy', 'Melodic', 'Accessible', 'Structured', 'Commercial'],
-        'Rock': ['Guitar-driven', 'Raw', 'Energetic', 'Live', 'Emotional'],
-        'Ambient': ['Atmospheric', 'Textural', 'Spacious', 'Evolving', 'Meditative']
-    };
-    
-    const availableCharacteristics = characteristicsByGenre[baseGenre] || ['Unique', 'Distinctive', 'Expressive'];
-    const finalCharacteristics = availableCharacteristics
-        .sort(() => 0.5 - Math.random())
-        .slice(0, 3);
-    
-    // 📅 Era coherente con contexto cultural
-    let appropriateEra;
-    if (finalContext.includes('90s') || finalContext.includes('Detroit') || finalContext.includes('Chicago')) {
-        appropriateEra = '1990s';
-    } else if (finalContext.includes('80s') || finalContext.includes('New Wave')) {
-        appropriateEra = '1980s';
-    } else if (finalContext.includes('2000s') || finalContext.includes('French')) {
-        appropriateEra = '2000s';
-    } else if (finalContext.includes('Modern') || finalContext.includes('Contemporary')) {
-        appropriateEra = '2010s';
-    } else {
-        appropriateEra = '2000s'; // Fallback seguro
-    }
-    
-    // 🔑 Key y mode generation (coherente con género)
-    const musicalKeys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    const randomKey = musicalKeys[Math.floor(Math.random() * musicalKeys.length)];
-    
-    // Géneros electrónicos tienden a usar menor, rock/pop tienden a mayor
-    const majorProbability = ['Pop', 'House', 'Trance'].includes(baseGenre) ? 0.7 : 0.4;
-    const finalMode = Math.random() < majorProbability ? 'Major' : 'Minor';
-    
-    // 🎯 VALIDACIÓN FINAL DE COHERENCIA CRUZADA
-    
-    // ✅ Validar Energy vs Danceability (regla crítica)
-    if (finalEnergy > 0.8 && finalDanceability < 0.6) {
-        console.warn(`⚠️ COHERENCIA: Energy alta (${finalEnergy}) pero danceability baja (${finalDanceability}), ajustando...`);
-        finalDanceability = Math.max(0.6, finalDanceability);
-    }
-    
-    // ✅ Validar Mood vs Valence (regla crítica)
-    if ((baseMood === 'Happy' || baseMood === 'Euphoric') && finalValence < 0.6) {
-        console.warn(`⚠️ COHERENCIA: Mood positivo (${baseMood}) pero valence bajo (${finalValence}), ajustando...`);
-        finalValence = Math.max(0.6, finalValence);
-    }
-    
-    if ((baseMood === 'Melancholic' || baseMood === 'Dark') && finalValence > 0.4) {
-        console.warn(`⚠️ COHERENCIA: Mood negativo (${baseMood}) pero valence alto (${finalValence}), ajustando...`);
-        finalValence = Math.min(0.4, finalValence);
-    }
-    
-    // 🎯 Calcular confianza basada en coherencia
-    let confidenceScore = 0.8; // Base alta para simulación inteligente
-    
-    // Bonificación por coherencia energy-danceability
-    if (Math.abs(finalEnergy - finalDanceability) < 0.3) confidenceScore += 0.1;
-    
-    // Bonificación por coherencia mood-valence
-    const moodValenceCoherent = (
-        (baseMood === 'Happy' && finalValence > 0.6) ||
-        (baseMood === 'Energetic' && finalValence > 0.5) ||
-        (baseMood === 'Calm' && finalValence > 0.4 && finalValence < 0.7) ||
-        (baseMood === 'Melancholic' && finalValence < 0.4)
-    );
-    if (moodValenceCoherent) confidenceScore += 0.1;
-    
-    // Asegurar que la confianza esté en rango válido
-    confidenceScore = Math.max(0.7, Math.min(1.0, confidenceScore));
-    
-    // 🎯 Características coherentes con el género
-    const genreCharacteristics = {
-        'House': ['4/4 Beat', 'Repetitive', 'Groovy', 'Danceable'],
-        'Techno': ['Driving', 'Hypnotic', '4/4 Beat', 'Industrial'],
-        'Trance': ['Euphoric', 'Progressive Build', 'Emotional', 'Uplifting'],
-        'Electronic': ['Synthetic', 'Rhythmic', 'Processed', 'Digital'],
-        'Pop': ['Melodic', 'Catchy', 'Structured', 'Accessible'],
-        'Rock': ['Guitar-driven', 'Powerful', 'Dynamic', 'Raw'],
-        'Ambient': ['Atmospheric', 'Textural', 'Meditative', 'Spacious']
-    };
-    
-    const characteristics = genreCharacteristics[baseGenre] || ['Melodic', 'Rhythmic'];
-    
-    const mockResults = {
-        // ✅ CAMPOS LLM (análisis coherente)
-        LLM_DESCRIPTION: `Análisis inteligente de "${fileName}": Track ${baseGenre.toLowerCase()} con características ${baseMood.toLowerCase()}s y una producción que refleja el estilo ${finalContext}. La composición presenta elementos típicos del género con una energía ${finalEnergy > 0.7 ? 'alta' : finalEnergy > 0.4 ? 'media' : 'baja'} y alta coherencia musical entre todos sus elementos.`,
-        LLM_MOOD: baseMood,
-        LLM_GENRE: baseGenre,
-        LLM_SUBGENRE: `${characteristics[0]} ${baseGenre}`,
-        LLM_CONTEXT: finalContext,
-        LLM_OCCASIONS: finalEnergy > 0.7 ? ['Party', 'Club', 'Dancing'] : finalEnergy > 0.4 ? ['Background', 'Workout'] : ['Study', 'Meditation'],
-        LLM_ENERGY_LEVEL: finalEnergy > 0.7 ? 'Alto' : finalEnergy > 0.4 ? 'Medio' : 'Bajo',
-        LLM_DANCEABILITY: finalDanceability > 0.7 ? 'Alta' : finalDanceability > 0.4 ? 'Media' : 'Baja',
-        LLM_RECOMMENDATIONS: `Ideal para ${finalEnergy > 0.7 ? 'peak time' : 'warm-up'} en sets de ${baseGenre}. ${finalDanceability > 0.7 ? 'Excelente para pista de baile' : 'Mejor para momentos ambientales'}.`,
-        
-        // ✅ CAMPOS AI COHERENTES (validación cruzada aplicada)
-        AI_ENERGY: Math.round(finalEnergy * 100) / 100,
-        AI_DANCEABILITY: Math.round(finalDanceability * 100) / 100,
-        AI_VALENCE: Math.round(finalValence * 100) / 100,
-        AI_MOOD: baseMood,
-        AI_CULTURAL_CONTEXT: finalContext,
-        AI_SUBGENRES: selectedSubgenres,
-        AI_ERA: appropriateEra,
-        AI_OCCASION: finalOccasions,
-        AI_CHARACTERISTICS: finalCharacteristics,
-        AI_CONFIDENCE: Math.round(confidenceScore * 100) / 100,
-        AI_ANALYZED: true,
-        
-        // 🎵 Campos musicales técnicos coherentes
-        AI_KEY: randomKey,
-        AI_MODE: finalMode,
-        AI_TIME_SIGNATURE: 4, // 4/4 es estándar para la mayoría de géneros
-        
-        // 🔬 CAMPOS TÉCNICOS (valores coherentes con el análisis)
-        AI_ACOUSTICNESS: baseGenre === 'Ambient' || baseGenre === 'Rock' ? 
-            Math.round((Math.random() * 0.4 + 0.3) * 100) / 100 : // 0.3-0.7 para acústicos
-            Math.round((Math.random() * 0.3 + 0.1) * 100) / 100,   // 0.1-0.4 para electrónicos
-        
-        AI_INSTRUMENTALNESS: baseMood === 'Vocal' ? 
-            Math.round(Math.random() * 0.3 * 100) / 100 : // 0.0-0.3 para vocal
-            Math.round((Math.random() * 0.7 + 0.3) * 100) / 100, // 0.3-1.0 para instrumental
-        
-        AI_SPEECHINESS: Math.round(Math.random() * 0.3 * 100) / 100, // 0.0-0.3 típico para música
-        
-        AI_LIVENESS: Math.round(Math.random() * 0.4 * 100) / 100, // 0.0-0.4 para estudio
-        
-        AI_BPM: Math.floor(Math.random() * 60) + 80, // 80-140 BPM coherente con género
-        
-        AI_LOUDNESS: Math.round((Math.random() * 15 - 20) * 100) / 100 // -20 a -5 dB
-    };
-    
-    console.log(`🔧 Análisis LLM simulado coherente para "${fileName}": ${baseGenre} ${baseMood} (E:${finalEnergy.toFixed(2)}, D:${finalDanceability.toFixed(2)}, V:${finalValence.toFixed(2)}, C:${confidenceScore.toFixed(2)})`);
-    
-    return {
-        success: true,
-        results: mockResults,
-        description: mockResults.LLM_DESCRIPTION,
-        mood: mockResults.LLM_MOOD,
-        genre: mockResults.LLM_GENRE
-    };
-}
+// REMOVED: Mock analysis code that was generating fake coherent results
 
 // 🧠 IPC Handler: Análisis LLM únicamente con placeholders AI_*
 ipcMain.handle('analyze-llm-only', async (event, filePath) => {
@@ -1313,7 +990,10 @@ ipcMain.handle('analyze-llm-only', async (event, filePath) => {
 }`;
 
         // Llamada a Claude API
-        const apiKey = process.env.CLAUDE_API_KEY || 'your-claude-api-key-here';
+        const apiKey = process.env.ANTHROPIC_API_KEY;
+        if (!apiKey || apiKey === 'your-claude-api-key-here') {
+            throw new Error('API key not configured. Please set ANTHROPIC_API_KEY in your .env file');
+        }
         
         const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
@@ -1335,44 +1015,8 @@ ipcMain.handle('analyze-llm-only', async (event, filePath) => {
         if (!claudeResponse.ok) {
             const errorText = await claudeResponse.text();
             console.error('❌ Claude API Error:', claudeResponse.status, claudeResponse.statusText);
-            console.warn('⚠️ Claude API no disponible, usando análisis simulado LLM');
-            
-            // Fallback: Análisis simulado LLM únicamente
-            const mockLLMResults = {
-                LLM_DESCRIPTION: `Análisis musical profesional del archivo ${path.basename(filePath)}. Interpretación basada en metadatos disponibles y contexto musical.`,
-                LLM_MOOD: "Energetic",
-                LLM_GENRE: fileMetadata.metadata?.genre || "Pop",
-                LLM_SUBGENRE: "Modern Pop",
-                LLM_CONTEXT: "Contemporary Music Scene",
-                LLM_OCCASIONS: ["Club", "Party"],
-                LLM_ENERGY_LEVEL: "Alto",
-                LLM_DANCEABILITY: "Alta",
-                LLM_RECOMMENDATIONS: "Ideal para sets modernos y ambientes festivos",
-                
-                // Placeholders AI_* con nombres de algoritmos
-                AI_ACOUSTICNESS: "ALGORITMO SPECTRAL_ANALYSIS",
-                AI_ANALYZED: "ALGORITMO COMPLETION_TRACKER", 
-                AI_BPM: "ALGORITMO BEAT_TRACKING",
-                AI_CHARACTERISTICS: "ALGORITMO FEATURE_EXTRACTION",
-                AI_CONFIDENCE: "ALGORITMO CONFIDENCE_CALCULATOR",
-                AI_CULTURAL_CONTEXT: "ALGORITMO CULTURAL_ANALYZER",
-                AI_DANCEABILITY: "ALGORITMO DANCEABILITY_DETECTOR",
-                AI_ENERGY: "ALGORITMO ENERGY_ANALYZER",
-                AI_ERA: "ALGORITMO ERA_CLASSIFIER",
-                AI_INSTRUMENTALNESS: "ALGORITMO VOCAL_DETECTION",
-                AI_KEY: "ALGORITMO KEY_DETECTION",
-                AI_LIVENESS: "ALGORITMO LIVENESS_DETECTION",
-                AI_LOUDNESS: "ALGORITMO LOUDNESS_ANALYSIS",
-                AI_MODE: "ALGORITMO MODE_DETECTION",
-                AI_MOOD: "ALGORITMO MOOD_CLASSIFIER",
-                AI_OCCASION: "ALGORITMO OCCASION_PREDICTOR",
-                AI_SPEECHINESS: "ALGORITMO SPEECH_DETECTION",
-                AI_SUBGENRES: "ALGORITMO SUBGENRE_CLASSIFIER",
-                AI_TIME_SIGNATURE: "ALGORITMO TIME_SIGNATURE_DETECTION",
-                AI_VALENCE: "ALGORITMO VALENCE_ANALYZER"
-            };
-            
-            return await processLLMOnlyResults(filePath, mockLLMResults);
+            // REMOVED: Mock LLM fallback
+            throw new Error('Claude API not available and mock analysis is prohibited');
         }
 
         const claudeData = await claudeResponse.json();

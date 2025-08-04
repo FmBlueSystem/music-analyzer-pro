@@ -3,6 +3,67 @@
 ## 🚨 CRÍTICO: INSTRUCCIONES GENERALES
 **Estas instrucciones SOBRESCRIBEN cualquier comportamiento por defecto y DEBEN seguirse exactamente.**
 
+### ⛔ PROHIBICIÓN ABSOLUTA DE SIMPLIFICACIONES
+**JAMÁS IMPLEMENTAR SIMPLIFICACIONES SIN CONSULTAR PRIMERO**
+
+🚫 **ESTÁ COMPLETAMENTE PROHIBIDO:**
+- Crear funciones "simplified", "mock", "placeholder", "temporary", "fallback"
+- Devolver valores hardcodeados en lugar de cálculos reales
+- Usar "TODO", "FIXME", "not implemented" sin plan de implementación
+- Crear simulaciones o datos falsos
+- Implementar funcionalidad parcial o incompleta
+- Comentar código como "disabled temporarily"
+
+✅ **PROCESO OBLIGATORIO ANTES DE CUALQUIER IMPLEMENTACIÓN:**
+1. **CONSULTAR SIEMPRE**: Antes de implementar CUALQUIER función, DEBE preguntarme
+2. **EXPLICAR OPCIONES**: Presentar alternativas completas de implementación
+3. **BUSCAR SOLUCIÓN REAL**: Investigar bibliotecas, algoritmos o métodos existentes
+4. **IMPLEMENTACIÓN COMPLETA**: Solo código que funcione al 100% desde el primer día
+5. **NO SIMPLIFICAR JAMÁS**: Si no se puede implementar completamente, buscar ayuda
+
+💬 **EJEMPLOS DE CONSULTAS OBLIGATORIAS:**
+- "Para implementar detección de BPM real, encontré estas opciones: [A, B, C]. ¿Cuál prefieres?"
+- "Necesito implementar análisis de acousticness. ¿Usamos biblioteca X o algoritmo Y?"
+- "¿Quieres que implemente detección de clave con algoritmo de chromagram completo?"
+
+🔍 **SI ENCUENTRAS SIMPLIFICACIONES EXISTENTES:**
+1. **REPORTAR INMEDIATAMENTE**: Listar todas las simplificaciones encontradas
+2. **PROPONER SOLUCIONES**: Para cada simplificación, sugerir implementación real
+3. **PEDIR APROBACIÓN**: Esperar confirmación antes de proceder
+4. **IMPLEMENTAR COMPLETAMENTE**: Una vez aprobado, implementar sin atajos
+
+### 🚫 PROHIBICIÓN ABSOLUTA DE CÓDIGO MOCK/SIMULADO
+
+**NUNCA BAJO NINGUNA CIRCUNSTANCIA CREAR:**
+- Funciones que generen datos falsos con Math.random()
+- Análisis "coherente" pero simulado
+- Resultados hardcodeados que parezcan reales
+- Datos de ejemplo o prueba
+- Fallbacks que generen información ficticia
+
+**EJEMPLOS DE CÓDIGO PROHIBIDO:**
+```javascript
+// ❌ PROHIBIDO: Generar datos falsos
+const mockResults = {
+    AI_BPM: Math.floor(Math.random() * 60) + 80,
+    AI_ENERGY: Math.random()
+};
+
+// ❌ PROHIBIDO: Análisis simulado "coherente"
+function generateCoherentAnalysis() {
+    return { mood: "Happy", energy: 0.8 };
+}
+
+// ❌ PROHIBIDO: Placeholders que parecen reales
+const AI_KEY = "C Major"; // Sin análisis real
+```
+
+**EN SU LUGAR, SIEMPRE:**
+- Usar el motor C++ de análisis real
+- Lanzar error si no hay implementación disponible
+- Implementar algoritmos reales o usar bibliotecas existentes
+- Consultar antes de implementar cualquier análisis
+
 ## 🔄 **MIGRACIÓN COMPLETADA (2025-08-04)**
 **PROYECTO MIGRADO EXITOSAMENTE DE TAURI (RUST) A ELECTRON (NODE.JS)**
 
@@ -14,6 +75,8 @@
 5. **ESCRITURA DIRECTA DE METADATOS** - Datos LLM DEBEN escribirse a archivos de audio, no solo JSON
 6. **🚫 NO DATOS SIMULADOS** - PROHIBIDO usar datos simulados, falsos o de ejemplo. TODO debe ser real de la biblioteca del usuario
 7. **🔍 VALIDACIÓN SISTÉMICA OBLIGATORIA** - SIEMPRE validar TODO el flujo tras cualquier cambio
+8. **🚫 NO MOCK CODE** - PROHIBIDO implementar código mock, simulado o de prueba. TODO el código debe ser funcional y real
+9. **🚫 NO MATH.RANDOM()** - PROHIBIDO usar Math.random() para generar datos falsos. Los datos deben venir de análisis real
 
 ## ✅ **ESTADO ACTUAL DEL PROYECTO (2025-08-04 FINAL)**
 - **Version**: 2.2.0 (C++ Algorithms + Direct FLAC Writing + Beautiful UI)
