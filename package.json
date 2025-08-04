@@ -1,0 +1,24 @@
+{
+  "name": "music-analyzer-electron",
+  "version": "1.0.0",
+  "description": "Desktop app to analyze music files with LLM",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build-addon": "node-gyp rebuild",
+    "install-addon": "npm install nan node-gyp && npm run build-addon"
+  },
+  "devDependencies": {
+    "electron": "^28.3.3",
+    "node-gyp": "^10.3.1"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.57.0",
+    "flac-metadata": "^0.1.1",
+    "music-metadata": "^11.7.3",
+    "node-addon-api": "^7.0.0",
+    "node-id3": "^0.2.9",
+    "sqlite3": "^5.1.7"
+  }
+}

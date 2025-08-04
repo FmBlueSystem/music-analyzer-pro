@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Tabs</title>
+    <style>
+        .tab-btn {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #f0f0f0;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+        .tab-btn.active {
+            background: #007AFF;
+            color: white;
+        }
+        .tab-content {
+            display: none;
+            padding: 20px;
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test de Navegación de Pestañas</h1>
+    
+    <!-- Tab Navigation -->
+    <nav>
+        <button class="tab-btn active" data-tab="library" onclick="switchTab('library')">📚 Biblioteca</button>
+        <button class="tab-btn" data-tab="analysis" onclick="switchTab('analysis')">🔬 Análisis</button>
+        <button class="tab-btn" data-tab="hamms" onclick="switchTab('hamms')">📊 HAMMS</button>
+        <button class="tab-btn" data-tab="stats" onclick="switchTab('stats')">📈 Sistema</button>
+    </nav>
+    
+    <!-- Tab Contents -->
+    <section class="tab-content active" id="library-tab">
+        <h2>📚 Biblioteca</h2>
+        <p>Contenido de la biblioteca</p>
+    </section>
+    
+    <section class="tab-content" id="analysis-tab">
+        <h2>🔬 Análisis</h2>
+        <p>Contenido del análisis</p>
+    </section>
+    
+    <section class="tab-content" id="hamms-tab">
+        <h2>📊 HAMMS</h2>
+        <p>Contenido de HAMMS</p>
+    </section>
+    
+    <section class="tab-content" id="stats-tab">
+        <h2>📈 Sistema</h2>
+        <p>Contenido del sistema</p>
+    </section>
+    
+    <script>
+        console.log('🔧 Script cargando...');
+        
+        function switchTab(targetTab) {
+            console.log('🔄 switchTab called:', targetTab);
+            
+            // Get elements
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            console.log('Found buttons:', tabBtns.length, 'contents:', tabContents.length);
+            
+            // Update buttons
+            tabBtns.forEach(btn => {
+                if (btn.dataset.tab === targetTab) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+            
+            // Update contents
+            tabContents.forEach(content => {
+                if (content.id === `${targetTab}-tab`) {
+                    content.classList.add('active');
+                } else {
+                    content.classList.remove('active');
+                }
+            });
+            
+            console.log('✅ Tab switched to:', targetTab);
+        }
+        
+        console.log('✅ Script loaded successfully');
+    </script>
+</body>
+</html>

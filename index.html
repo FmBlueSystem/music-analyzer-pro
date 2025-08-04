@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎵 Music Analyzer Pro - Database Ready</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <h1>🎵 Music Analyzer Pro</h1>
+            <div class="header-controls">
+                <button id="folderBtn" class="btn btn-primary">📁 Seleccionar Carpeta</button>
+                <button id="analyzeLLMBtn" class="btn btn-success">🧠 Analizar LLM Todos</button>
+                <button id="cleanDataBtn" class="btn btn-warning">🔧 Limpiar Duplicados</button>
+                <button id="statsBtn" class="btn btn-secondary">📊 Estadísticas</button>
+                <span id="status" class="status">Listo para analizar</span>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Navigation Tabs -->
+            <nav class="tab-nav">
+                <button class="tab-btn active" data-tab="biblioteca">📚 Biblioteca</button>
+                <button class="tab-btn" data-tab="analisis">🔬 Análisis</button>
+                <button class="tab-btn" data-tab="hamms">🎯 HAMMS</button>
+                <button class="tab-btn" data-tab="sistema">⚙️ Sistema</button>
+            </nav>
+
+            <!-- Biblioteca Tab -->
+            <div id="biblioteca" class="tab-content active">
+                <!-- View Toggle -->
+                <div id="viewToggle" class="view-toggle" style="display: none;">
+                    <button class="toggle-btn" data-view="cards">🎴 Tarjetas</button>
+                    <button class="toggle-btn active" data-view="table">📊 Tabla</button>
+                </div>
+
+                <!-- Cards View -->
+                <div id="cardsView" class="cards-view" style="display: none;">
+                    <div id="filesGrid" class="files-grid"></div>
+                </div>
+
+                <!-- Table View -->
+                <div id="tableView" class="table-view">
+                    <div class="table-container-compact">
+                        <table class="compact-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-index">#</th>
+                                    <th class="col-name">🎵 Archivo</th>
+                                    <th class="col-size">📁 Tamaño</th>
+                                    <th class="col-progress">📊 Progreso</th>
+                                    <th class="col-bpm">🎼 BPM</th>
+                                    <th class="col-energy">⚡ Energía</th>
+                                    <th class="col-mood">😊 Mood</th>
+                                    <th class="col-genre">🎵 Género</th>
+                                    <th class="col-subgenre">🎼 Subgénero</th>
+                                    <th class="col-actions">🔧 Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="filesTableBody">
+                                <!-- Files will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analysis Tab -->
+            <div id="analisis" class="tab-content">
+                <div class="analysis-cards">
+                    <div class="analysis-card">
+                        <h3>🚀 Analizar Toda la Biblioteca</h3>
+                        <p>Ejecuta los 19 algoritmos AI en todos los archivos de tu biblioteca</p>
+                        <button onclick="runBatchAnalysisReal()" class="btn btn-primary">Iniciar Análisis Completo</button>
+                    </div>
+                    <div class="analysis-card">
+                        <h3>🧠 Análisis Musical IA Global</h3>
+                        <p>Solo análisis LLM con corrección de género automática<br><small>Campos AI_* poblados con nombres de algoritmos</small></p>
+                        <button onclick="runLLMOnlyAnalysisGlobal()" class="btn btn-secondary">Análisis LLM Únicamente</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- HAMMS Tab -->
+            <div id="hamms" class="tab-content">
+                <h2>🎯 HAMMS - Sistema de Similitud Musical</h2>
+                <p>Vectores de 7 dimensiones para análisis de similitud avanzado</p>
+            </div>
+
+            <!-- Sistema Tab -->
+            <div id="sistema" class="tab-content">
+                <div class="system-stats">
+                    <h2>⚙️ Estadísticas del Sistema</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3>📁 Archivos</h3>
+                            <p id="totalFiles">Cargando...</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>🔬 Analizados</h3>
+                            <p id="analyzedFiles">Cargando...</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>💾 Cache</h3>
+                            <p id="cacheInfo">Cargando...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        let currentFiles = [];
+        let currentView = 'table';
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Music Analyzer Pro iniciado');
+            initializeTabs();
+            initializeViewToggle(); 
+            loadExistingFiles();
+            
+            // 🤖 ANÁLISIS AUTOMÁTICO: Ejecutar análisis completo después de cargar archivos
+            setTimeout(async () => {
+                console.log('🤖 Iniciando análisis automático de toda la biblioteca...');
+                await runBatchAnalysisReal();
+            }, 5000); // Esperar 5 segundos para que termine la carga inicial
+        });
+
+        function updateStatus(message) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            console.log(message);
+        }
+
+        // Tab Navigation
+        function initializeTabs() {
+            const tabBtns = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetTab = btn.getAttribute('data-tab');
+                    
+                    // Remove active class from all tabs and contents
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    // Add active class to clicked tab and corresponding content
+                    btn.classList.add('active');
+                    document.getElementById(targetTab).classList.add('active');
+                });
+            });
+        }
+
+        // View Toggle
+        function initializeViewToggle() {
+            const toggleButtons = document.querySelectorAll('.toggle-btn');
+            
+            toggleButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const view = btn.getAttribute('data-view');
+                    
+                    // Remove active class from all buttons
+                    toggleButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    // Switch view
+                    if (view === 'cards') {
+                        switchToCardsView();
+                    } else {
+                        switchToTableView();
+                    }
+                });
+            });
+        }
+
+        function switchToCardsView() {
+            currentView = 'cards';
+            const cardsView = document.getElementById('cardsView');
+            const tableView = document.getElementById('tableView');
+            
+            cardsView.style.display = 'block';
+            tableView.style.display = 'none';
+        }
+
+        function switchToTableView() {
+            currentView = 'table';
+            const cardsView = document.getElementById('cardsView');
+            const tableView = document.getElementById('tableView');
+            
+            cardsView.style.display = 'none';
+            tableView.style.display = 'block';
+        }
+
+        // Load existing files from database
+        async function loadExistingFiles() {
+            updateStatus('📂 Cargando archivos desde la base de datos...');
+            
+            try {
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    // Load real files from database
+                    const files = await ipcRenderer.invoke('get-existing-files', 10000);
+                    
+                    console.log('🔍 DEBUG: Raw files from IPC:', files?.slice(0, 3));
+                    
+                    currentFiles = files || [];
+                    
+                    if (currentFiles.length > 0) {
+                        console.log('🔍 DEBUG: currentFiles array first 3:', currentFiles.slice(0, 3).map(f => ({ name: f.name, id: f.id })));
+                        displayFiles(currentFiles);
+                        updateStatus(`✅ ${currentFiles.length} archivos reales cargados de la biblioteca`);
+                    } else {
+                        updateStatus('📭 No hay archivos en la base de datos. Usa "Seleccionar Carpeta" para agregar archivos.');
+                    }
+                } else {
+                    updateStatus('❌ No se puede acceder al sistema Electron');
+                }
+            } catch (error) {
+                console.error('Error loading files:', error);
+                updateStatus('❌ Error cargando archivos desde la base de datos');
+            }
+        }
+
+        function displayFiles(files) {
+            displayCardsView(files);
+            displayTableView(files);
+            
+            // Show controls and default to table view
+            document.getElementById('viewToggle').style.display = 'flex';
+            switchToTableView();
+            
+            updateStats();
+        }
+
+        function displayCardsView(files) {
+            const grid = document.getElementById('filesGrid');
+            grid.innerHTML = '';
+            
+            console.log(`🔍 Displaying ${files.length} files. First 3:`, files.slice(0, 3).map(f => f.name));
+            
+            files.forEach((file, index) => {
+                const progress = file.progress || '0/19';
+                const [completed, total] = progress.split('/').map(n => parseInt(n));
+                const progressPercent = Math.round((completed / total) * 100);
+                const progressClass = completed === 19 ? 'progress-complete' : '';
+                
+                const ext = file.extension || file.name.split('.').pop() || 'mp3';
+                const icon = getFileIcon(ext);
+                
+                const card = document.createElement('div');
+                card.className = `file-card ${progressClass}`;
+                card.innerHTML = `
+                    <div class="card-header">
+                        <span class="file-icon">${icon}</span>
+                        <h3 class="file-name" title="${file.name}">${file.name}</h3>
+                        <span class="file-size">${file.size} MB</span>
+                    </div>
+                    
+                    <div class="progress-section">
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                        </div>
+                        <span class="progress-text">${progress}</span>
+                    </div>
+                    
+                    <div class="metadata-preview">
+                        <div class="metadata-row">
+                            <span>BPM:</span>
+                            <span class="metadata-value">${file.llm_metadata?.bpm_llm || 'Pendiente'}</span>
+                        </div>
+                        <div class="metadata-row">
+                            <span>Energía:</span>
+                            <span class="metadata-value">${file.llm_metadata?.energy || 'Pendiente'}</span>
+                        </div>
+                        <div class="metadata-row">
+                            <span>Estado:</span>
+                            <span class="metadata-value">${getStatusText(file.status)}</span>
+                        </div>
+                        <div class="metadata-row">
+                            <span>LLM:</span>
+                            <span class="metadata-value">${file.claude_llm?.analyzed ? '🧠 Analizado' : 'Pendiente'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="card-actions">
+                        <button class="btn-card btn-primary-card btn-analyze" data-file-path="${file.path}" data-file-index="${index}">
+                            🤖 Analizar
+                        </button>
+                        <button class="btn-card btn-primary-card btn-llm" data-file-path="${file.path}" data-file-index="${index}">
+                            🧠 LLM
+                        </button>
+                        <button class="btn-card btn-secondary-card" onclick="showFileDetails(${index})">
+                            📊 Detalles
+                        </button>
+                    </div>
+                `;
+                
+                grid.appendChild(card);
+            });
+            
+            attachAnalyzeButtonListeners();
+        }
+
+        function displayTableView(files) {
+            const tbody = document.getElementById('filesTableBody');
+            tbody.innerHTML = '';
+            
+            files.forEach((file, index) => {
+                
+                const progress = file.progress || '0/19';
+                const [completed, total] = progress.split('/').map(n => parseInt(n));
+                
+                const progressClass = completed === 19 ? 'progress-complete' : completed > 0 ? 'progress-partial' : '';
+                const statusIcon = completed === 19 ? '✅' : completed > 0 ? '🔄' : '⏳';
+                
+                const ext = file.extension || file.name.split('.').pop() || 'mp3';
+                const icon = getFileIcon(ext);
+                
+                const bpmBadge = file.llm_metadata?.bpm_llm ? 
+                    `<span class="badge badge-bpm">${file.llm_metadata.bpm_llm}</span>` : 
+                    '<span class="badge badge-pending">-</span>';
+                
+                const energyClass = getEnergyClass(file.llm_metadata?.energy);
+                const energyBadge = file.llm_metadata?.energy ? 
+                    `<span class="badge badge-energy ${energyClass}">${Math.round(file.llm_metadata.energy * 100)}%</span>` : 
+                    '<span class="badge badge-pending">-</span>';
+                
+                const moodBadge = file.llm_metadata?.mood ? 
+                    `<span class="badge badge-mood">${file.llm_metadata.mood}</span>` : 
+                    '<span class="badge badge-pending">-</span>';
+
+                // Genre from LLM data or standard metadata
+                const genreText = file.claude_llm?.genre || file.standard_metadata?.genre || 
+                                 (file.llm_metadata?.AI_CULTURAL_CONTEXT ? 
+                                  file.llm_metadata.AI_CULTURAL_CONTEXT.split(' ')[0] : null) || '-';
+                const genreBadge = genreText !== '-' ? 
+                    `<span class="badge badge-genre">${genreText}</span>` : 
+                    '<span class="badge badge-pending">-</span>';
+
+                // Subgenre from LLM data
+                const subgenreText = file.claude_llm?.subgenre || file.subgenre || 
+                                    (Array.isArray(file.llm_metadata?.AI_SUBGENRES) && file.llm_metadata.AI_SUBGENRES.length > 0 ? 
+                                     file.llm_metadata.AI_SUBGENRES[0] : null) || '-';
+                const subgenreBadge = subgenreText !== '-' ? 
+                    `<span class="badge badge-subgenre">${subgenreText}</span>` : 
+                    '<span class="badge badge-pending">-</span>';
+                
+                const row = document.createElement('tr');
+                row.className = progressClass;
+                row.innerHTML = `
+                    <td class="col-index">${index + 1}</td>
+                    <td class="col-name">
+                        <span class="file-icon">${icon}</span>
+                        <span class="file-name" title="${file.name}">${file.name}</span>
+                    </td>
+                    <td class="col-size">${file.size} MB</td>
+                    <td class="col-progress">
+                        <span class="status-icon">${statusIcon}</span>
+                        <span class="progress-text">${progress}</span>
+                    </td>
+                    <td class="col-bpm">${bpmBadge}</td>
+                    <td class="col-energy">${energyBadge}</td>
+                    <td class="col-mood">${moodBadge}</td>
+                    <td class="col-genre">${genreBadge}</td>
+                    <td class="col-subgenre">${subgenreBadge}</td>
+                    <td class="col-actions">
+                        <button class="btn-table btn-analyze" data-file-path="${file.path}" data-file-index="${index}" title="Analizar con 19 algoritmos C++">
+                            🤖 Analizar
+                        </button>
+                        <button class="btn-table btn-llm" data-file-path="${file.path}" data-file-index="${index}" title="Análisis con Claude LLM">
+                            🧠 LLM
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            attachAnalyzeButtonListeners();
+        }
+
+        function attachAnalyzeButtonListeners() {
+            // Attach C++ analyze button listeners
+            const analyzeButtons = document.querySelectorAll('.btn-analyze');
+            analyzeButtons.forEach(button => {
+                button.removeEventListener('click', handleAnalyzeClick);
+                button.addEventListener('click', handleAnalyzeClick);
+            });
+            
+            // Attach LLM analyze button listeners
+            const llmButtons = document.querySelectorAll('.btn-llm');
+            llmButtons.forEach(button => {
+                button.removeEventListener('click', handleLLMAnalyzeClick);
+                button.addEventListener('click', handleLLMAnalyzeClick);
+            });
+        }
+
+        function handleAnalyzeClick(event) {
+            const button = event.target;
+            const filePath = button.getAttribute('data-file-path');
+            const fileIndex = parseInt(button.getAttribute('data-file-index'));
+            
+            if (filePath && !isNaN(fileIndex)) {
+                button.disabled = true;
+                button.innerHTML = '⏳ Analizando...';
+                button.style.opacity = '0.6';
+                
+                analyzeFileReal(filePath, fileIndex).finally(() => {
+                    button.disabled = false;
+                    button.innerHTML = '🤖 Analizar';
+                    button.style.opacity = '1';
+                });
+            } else {
+                console.error('Invalid file data for analysis:', { filePath, fileIndex });
+                updateStatus('❌ Error: Datos de archivo inválidos para análisis');
+            }
+        }
+
+        function handleLLMAnalyzeClick(event) {
+            const button = event.target;
+            const filePath = button.getAttribute('data-file-path');
+            const fileIndex = parseInt(button.getAttribute('data-file-index'));
+            
+            if (filePath && !isNaN(fileIndex)) {
+                button.disabled = true;
+                button.innerHTML = '🧠 Analizando...';
+                button.style.opacity = '0.6';
+                
+                analyzeLLM(filePath, fileIndex).finally(() => {
+                    button.disabled = false;
+                    button.innerHTML = '🧠 LLM';
+                    button.style.opacity = '1';
+                });
+            } else {
+                console.error('Invalid file data for LLM analysis:', { filePath, fileIndex });
+                updateStatus('❌ Error: Datos de archivo inválidos para análisis LLM');
+            }
+        }
+
+        // Nueva función para análisis LLM con Claude
+        async function analyzeLLM(filePath, index) {
+            if (!filePath || !currentFiles[index]) return;
+            
+            updateStatus(`🧠 Analizando ${currentFiles[index].name} con Claude LLM...`);
+            
+            try {
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    const result = await ipcRenderer.invoke('analyze-llm', filePath);
+                    
+                    if (result.success) {
+                        updateStatus(`✅ Análisis LLM completado para ${currentFiles[index].name}`);
+                        
+                        // Reload files from database to get updated LLM data
+                        try {
+                            const refreshedFiles = await ipcRenderer.invoke('get-existing-files', 10000);
+                            if (refreshedFiles && refreshedFiles.length > 0) {
+                                currentFiles = refreshedFiles;
+                                displayFiles(currentFiles);
+                                console.log(`🔄 Archivos recargados desde la base de datos: ${refreshedFiles.length}`);
+                            }
+                        } catch (reloadError) {
+                            console.error('Error recargando archivos:', reloadError);
+                            currentFiles[index].claude_llm = {
+                                analyzed: true,
+                                description: result.description,
+                                mood: result.mood,
+                                genre: result.genre
+                            };
+                            displayFiles(currentFiles);
+                        }
+                    } else {
+                        updateStatus(`❌ Error en análisis LLM: ${result.error}`);
+                    }
+                } else {
+                    updateStatus('❌ Error: No se puede acceder al sistema Electron');
+                }
+                
+            } catch (error) {
+                console.error('Error calling LLM analysis:', error);
+                updateStatus(`❌ Error ejecutando análisis LLM: ${error.message}`);
+            }
+        }
+
+        async function analyzeFileReal(filePath, index) {
+            if (!filePath || !currentFiles[index]) return;
+            
+            updateStatus(`🔬 Analizando ${currentFiles[index].name} con 19 algoritmos...`);
+            
+            try {
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    
+                    const algorithms = [
+                        'AI_ACOUSTICNESS', 'AI_BPM', 'AI_DANCEABILITY', 'AI_ENERGY', 'AI_INSTRUMENTALNESS',
+                        'AI_KEY', 'AI_LIVENESS', 'AI_LOUDNESS', 'AI_MODE', 'AI_MOOD', 'AI_SPEECHINESS',
+                        'AI_TIME_SIGNATURE', 'AI_VALENCE', 'AI_CULTURAL_CONTEXT', 'AI_SUBGENRES',
+                        'AI_ERA', 'AI_OCCASION', 'AI_CHARACTERISTICS', 'AI_CONFIDENCE'
+                    ];
+                    
+                    const result = await ipcRenderer.invoke('analyze-file-with-algorithms', filePath, algorithms);
+                    
+                    if (result.success) {
+                        const refreshedFiles = await ipcRenderer.invoke('get-existing-files', 10000);
+                        if (refreshedFiles && refreshedFiles.length > 0) {
+                            currentFiles = refreshedFiles;
+                            displayFiles(currentFiles);
+                        }
+                        updateStatus(`✅ Análisis completado para ${currentFiles[index].name} (${result.engine})`);
+                    } else {
+                        updateStatus(`❌ Error en análisis: ${result.error}`);
+                    }
+                } else {
+                    updateStatus('❌ Error: No se puede acceder al sistema Electron');
+                }
+            } catch (error) {
+                console.error('Error in real analysis:', error);
+                updateStatus(`❌ Error ejecutando análisis: ${error.message}`);
+            }
+        }
+
+        async function runBatchAnalysisReal() {
+            if (currentFiles.length === 0) {
+                updateStatus('❌ No hay archivos para analizar');
+                return;
+            }
+
+            updateStatus('🚀 Iniciando análisis por lotes...');
+            
+            const algorithms = [
+                'AI_ACOUSTICNESS', 'AI_BPM', 'AI_DANCEABILITY', 'AI_ENERGY', 'AI_INSTRUMENTALNESS',
+                'AI_KEY', 'AI_LIVENESS', 'AI_LOUDNESS', 'AI_MODE', 'AI_MOOD', 'AI_SPEECHINESS',
+                'AI_TIME_SIGNATURE', 'AI_VALENCE', 'AI_CULTURAL_CONTEXT', 'AI_SUBGENRES',
+                'AI_ERA', 'AI_OCCASION', 'AI_CHARACTERISTICS', 'AI_CONFIDENCE'
+            ];
+
+            let processed = 0;
+            const total = currentFiles.length;
+
+            try {
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+
+                    for (let i = 0; i < total; i++) {
+                        const file = currentFiles[i];
+                        updateStatus(`🔬 Analizando (${i + 1}/${total}): ${file.name}`);
+                        
+                        try {
+                            // 🤖 PASO 1: Análisis de 19 algoritmos AI
+                            updateStatus(`🔬 Analizando algoritmos AI (${i + 1}/${total}): ${file.name}`);
+                            const algorithmsResult = await ipcRenderer.invoke('analyze-file-with-algorithms', file.path, algorithms);
+                            
+                            // 🧠 PASO 2: Análisis LLM de contenido musical
+                            updateStatus(`🧠 Analizando contenido LLM (${i + 1}/${total}): ${file.name}`);
+                            const llmResult = await ipcRenderer.invoke('analyze-llm', file.path);
+                            
+                            if (algorithmsResult.success && llmResult.success) {
+                                processed++;
+                                console.log(`✅ Completed FULL analysis: ${file.name} (AI: ${algorithmsResult.engine}, LLM: OK)`);
+
+                                if (processed % 10 === 0) {
+                                    const refreshedFiles = await ipcRenderer.invoke('get-existing-files', 10000);
+                                    if (refreshedFiles && refreshedFiles.length > 0) {
+                                        currentFiles = refreshedFiles;
+                                        displayFiles(currentFiles);
+                                    }
+                                }
+                            } else {
+                                console.warn(`⚠️ Partial analysis: ${file.name} (AI: ${algorithmsResult.success}, LLM: ${llmResult.success})`);
+                            }
+                        } catch (fileError) {
+                            console.error(`❌ Error analyzing ${file.name}:`, fileError);
+                        }
+
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+
+                    const refreshedFiles = await ipcRenderer.invoke('get-existing-files', 10000);
+                    if (refreshedFiles && refreshedFiles.length > 0) {
+                        currentFiles = refreshedFiles;
+                        displayFiles(currentFiles);
+                    }
+
+                    updateStatus(`✅ Análisis por lotes completado: ${processed}/${total} archivos procesados`);
+                }
+            } catch (error) {
+                console.error('Error in batch analysis:', error);
+                updateStatus(`❌ Error en análisis por lotes: ${error.message}`);
+            }
+        }
+
+        // 🧠 Función: Análisis LLM Global Únicamente
+        async function runLLMOnlyAnalysisGlobal() {
+            if (currentFiles.length === 0) {
+                updateStatus('❌ No hay archivos para analizar');
+                return;
+            }
+
+            try {
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    
+                    const total = currentFiles.length;
+                    let processed = 0;
+                    let errors = 0;
+
+                    updateStatus(`🧠 Iniciando análisis LLM global de ${total} archivos...`);
+
+                    for (let i = 0; i < total; i++) {
+                        const file = currentFiles[i];
+                        updateStatus(`🧠 Analizando LLM (${i + 1}/${total}): ${file.name}`);
+                        
+                        try {
+                            // ✅ SOLO ANÁLISIS LLM - Incluye corrección de género automática
+                            const result = await ipcRenderer.invoke('analyze-llm-only', file.path);
+                            
+                            if (result.success) {
+                                processed++;
+                                console.log(`✅ LLM analysis completed: ${file.name}`);
+                                
+                                // Log género actualizado si existe
+                                if (result.results && result.results.LLM_GENRE) {
+                                    console.log(`🎵 Género corregido: ${result.results.LLM_GENRE} para ${file.name}`);
+                                }
+                            } else {
+                                errors++;
+                                console.warn(`⚠️ Failed LLM analysis: ${file.name} - ${result.error}`);
+                            }
+                            
+                            // Actualizar progreso cada 10 archivos
+                            if (processed % 10 === 0) {
+                                const refreshedFiles = await ipcRenderer.invoke('get-existing-files', 10000);
+                                if (refreshedFiles && refreshedFiles.length > 0) {
+                                    currentFiles = refreshedFiles;
+                                    displayFiles(currentFiles);
+                                }
+                            }
+
+                            // Pequeña pausa para evitar saturar la API
+                            await new Promise(resolve => setTimeout(resolve, 200));
+                            
+                        } catch (fileError) {
+                            errors++;
+                            console.error(`❌ Error analizando ${file.name}:`, fileError);
+                        }
+                    }
+
+                    // Actualización final
+                    const refreshedFiles = await ipcRenderer.invoke('get-existing-files', 10000);
+                    if (refreshedFiles && refreshedFiles.length > 0) {
+                        currentFiles = refreshedFiles;
+                        displayFiles(currentFiles);
+                    }
+
+                    updateStatus(`✅ Análisis LLM global completado: ${processed}/${total} archivos procesados (${errors} errores)`);
+                }
+            } catch (error) {
+                console.error('Error in LLM-only global analysis:', error);
+                updateStatus(`❌ Error en análisis LLM global: ${error.message}`);
+            }
+        }
+
+        // Helper functions
+        function getFileIcon(extension) {
+            const icons = {
+                'mp3': '🎵',
+                'flac': '🎼', 
+                'wav': '🎙️',
+                'm4a': '🎧',
+                'aac': '🎶',
+                'ogg': '🎻',
+                'wma': '🎤'
+            };
+            return icons[extension.toLowerCase()] || '🎵';
+        }
+
+        function getEnergyClass(energy) {
+            if (energy === '-' || !energy) return '';
+            const value = parseFloat(energy);
+            if (value >= 0.7) return 'high';
+            if (value >= 0.4) return 'medium'; 
+            return 'low';
+        }
+
+        function getStatusText(status) {
+            const statusTexts = {
+                'completed': '✅ Completo',
+                'partial': '🔄 En Progreso',
+                'pending': '⏳ Pendiente',
+                'error': '❌ Error'
+            };
+            return statusTexts[status] || '❓ Desconocido';
+        }
+
+        function updateStats() {
+            const completed = currentFiles.filter(f => f.status === 'completed').length;
+            const partial = currentFiles.filter(f => f.status === 'partial').length;
+            const pending = currentFiles.filter(f => f.status === 'pending').length;
+            
+            console.log(`📊 Stats: ${completed} completed, ${partial} partial, ${pending} pending`);
+        }
+
+        function showFileDetails(index) {
+            const file = currentFiles[index];
+            console.log('📊 File details:', file);
+            alert(`Detalles de ${file.name}\n\nTamaño: ${file.size} MB\nProgreso: ${file.progress}\nEstado: ${getStatusText(file.status)}`);
+        }
+
+        // Folder selection
+        document.getElementById('folderBtn').addEventListener('click', async function() {
+            try {
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    
+                    const folderPath = await ipcRenderer.invoke('select-folder');
+                    
+                    if (folderPath) {
+                        updateStatus(`📁 Cargando archivos desde: ${folderPath}`);
+                        
+                        const files = await ipcRenderer.invoke('load-audio-files', folderPath);
+                        
+                        currentFiles = files || [];
+                        displayFiles(currentFiles);
+                        updateStatus(`✅ ${currentFiles.length} archivos cargados desde ${folderPath}`);
+                    }
+                }
+            } catch (error) {
+                console.error('Error selecting folder:', error);
+                updateStatus('❌ Error seleccionando carpeta');
+            }
+        });
+
+        // Batch LLM Analysis Button
+        document.getElementById('analyzeLLMBtn').addEventListener('click', async function() {
+            try {
+                const confirmation = confirm('¿Analizar TODOS los archivos con LLM? Esto puede tomar mucho tiempo.');
+                if (confirmation) {
+                    await runBatchLLMAnalysis();
+                }
+            } catch (error) {
+                console.error('Error en análisis LLM masivo:', error);
+                updateStatus('❌ Error en análisis masivo');
+            }
+        });
+
+        // Clean Duplicate Data Button
+        document.getElementById('cleanDataBtn').addEventListener('click', async function() {
+            try {
+                const confirmation = confirm('¿Limpiar datos AI_* duplicados y contradictorios? Esto consolidará valores múltiples en uno solo.');
+                if (confirmation) {
+                    await cleanDuplicateAIData();
+                }
+            } catch (error) {
+                console.error('Error en limpieza de datos:', error);
+                updateStatus('❌ Error en limpieza de datos');
+            }
+        });
+
+        // Batch LLM Analysis Function
+        async function runBatchLLMAnalysis() {
+            try {
+                console.log('🚀 Iniciando análisis LLM masivo...');
+                
+                if (currentFiles.length === 0) {
+                    alert('No hay archivos para analizar. Por favor carga archivos primero.');
+                    return;
+                }
+                
+                updateStatus(`🧠 Analizando ${currentFiles.length} archivos...`);
+                
+                let completed = 0;
+                let errors = 0;
+                
+                // Procesar archivos en lotes pequeños para evitar sobrecarga
+                const batchSize = 3;
+                
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    
+                    for (let i = 0; i < currentFiles.length; i += batchSize) {
+                        const batch = currentFiles.slice(i, i + batchSize);
+                        
+                        // Procesar lote actual
+                        const promises = batch.map(async (file) => {
+                            try {
+                                console.log(`🧠 Analizando ${file.name}...`);
+                                const result = await ipcRenderer.invoke('analyze-llm', file.path);
+                                
+                                if (result.success) {
+                                    completed++;
+                                    console.log(`✅ Completado: ${file.name}`);
+                                } else {
+                                    errors++;
+                                    console.error(`❌ Error: ${file.name} - ${result.error}`);
+                                }
+                            } catch (error) {
+                                errors++;
+                                console.error(`❌ Error procesando ${file.name}:`, error);
+                            }
+                        });
+                        
+                        // Esperar que termine el lote actual
+                        await Promise.all(promises);
+                        
+                        // Actualizar progreso
+                        const progress = Math.round(((i + batch.length) / currentFiles.length) * 100);
+                        updateStatus(`🧠 Progreso: ${completed}/${currentFiles.length} (${progress}%) - Errores: ${errors}`);
+                        
+                        // Pausa pequeña entre lotes para no sobrecargar
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                    
+                    // Resultado final
+                    updateStatus(`✅ Análisis completado: ${completed} éxitos, ${errors} errores`);
+                    
+                    console.log(`🎉 Análisis LLM masivo completado: ${completed} éxitos, ${errors} errores`);
+                    
+                    // Recargar datos para mostrar resultados
+                    await loadExistingFiles();
+                }
+                
+            } catch (error) {
+                console.error('❌ Error en análisis LLM masivo:', error);
+                updateStatus('❌ Error en análisis masivo');
+            }
+        }
+
+        // Clean Duplicate AI Data Function
+        async function cleanDuplicateAIData() {
+            try {
+                updateStatus('🔧 Limpiando datos AI_* duplicados...');
+                
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    
+                    // Ejecutar limpieza de datos duplicados
+                    const cleanResult = await ipcRenderer.invoke('clean-duplicate-ai-data');
+                    
+                    if (cleanResult.success) {
+                        updateStatus(`✅ Limpieza completada: ${cleanResult.cleanedRecords} registros limpiados`);
+                        
+                        // Ejecutar validación de consistencia
+                        updateStatus('🔍 Validando consistencia de datos...');
+                        const validationResult = await ipcRenderer.invoke('validate-ai-consistency');
+                        
+                        if (validationResult.success) {
+                            const message = `🎉 Proceso completado:\n\n` +
+                                           `🔧 Registros limpiados: ${cleanResult.cleanedRecords}\n` +
+                                           `🔍 Total de registros validados: ${validationResult.totalRecords}\n` +
+                                           `⚠️ Inconsistencias encontradas: ${validationResult.inconsistencies.length}\n\n` +
+                                           `Los datos duplicados han sido consolidados usando lógica inteligente.`;
+                            
+                            alert(message);
+                            updateStatus(`✅ Limpieza completada: ${cleanResult.cleanedRecords} registros, ${validationResult.inconsistencies.length} inconsistencias`);
+                            
+                            // Recargar archivos para mostrar datos actualizados
+                            await loadExistingFiles();
+                        } else {
+                            updateStatus(`⚠️ Limpieza completada pero falló la validación: ${validationResult.error}`);
+                        }
+                    } else {
+                        updateStatus(`❌ Error en limpieza: ${cleanResult.error}`);
+                        alert(`Error en limpieza de datos: ${cleanResult.error}`);
+                    }
+                } else {
+                    updateStatus('❌ Error: No se puede acceder al sistema Electron');
+                }
+                
+            } catch (error) {
+                console.error('❌ Error en limpieza de datos duplicados:', error);
+                updateStatus(`❌ Error en limpieza: ${error.message}`);
+                alert(`Error ejecutando limpieza: ${error.message}`);
+            }
+        }
+
+        // Statistics
+        document.getElementById('statsBtn').addEventListener('click', async function() {
+            try {
+                if (typeof require !== 'undefined') {
+                    const { ipcRenderer } = require('electron');
+                    const counts = await ipcRenderer.invoke('get-database-counts');
+                    
+                    if (counts.error) {
+                        alert(`Error: ${counts.error}`)
+                        return;
+                    }
+                    
+                    const message = `📊 Estadísticas de la Base de Datos:
+                    
+📁 Archivos de Audio: ${counts.audioFiles.toLocaleString()}
+🔬 Archivos Analizados: ${counts.analyzedFiles.toLocaleString()}
+📊 Progreso de Análisis: ${counts.analysisProgress}%
+💾 Tamaño Total: ${counts.totalSizeGB} GB
+📂 Carpetas: ${counts.folders}
+
+📋 Desglose por Formato:
+${counts.extensionBreakdown.map(ext => `${ext.file_extension}: ${ext.count.toLocaleString()} archivos`).join('\n')}`;
+                    
+                    alert(message);
+                    
+                    document.getElementById('totalFiles').textContent = counts.audioFiles.toLocaleString();
+                    document.getElementById('analyzedFiles').textContent = counts.analyzedFiles.toLocaleString();
+                    document.getElementById('cacheInfo').textContent = `${counts.totalSizeGB} GB`;
+                }
+            } catch (error) {
+                console.error('Error getting stats:', error);
+                alert('❌ Error obteniendo estadísticas');
+            }
+        });
+    </script>
+</body>
+</html>

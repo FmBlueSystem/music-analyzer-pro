@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Test Minimal</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .tab-btn { 
+            padding: 10px 20px; 
+            margin: 5px; 
+            background: #f0f0f0; 
+            border: 1px solid #ccc; 
+            cursor: pointer; 
+        }
+        .tab-btn.active { background: #007AFF; color: white; }
+        .tab-content { 
+            display: none; 
+            padding: 20px; 
+            border: 1px solid #ccc; 
+            margin: 10px 0; 
+        }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Minimalista</h1>
+    
+    <div>
+        <button class="tab-btn active" onclick="showTab('tab1')">Tab 1</button>
+        <button class="tab-btn" onclick="showTab('tab2')">Tab 2</button>
+        <button onclick="testAlert()">Test Alert</button>
+    </div>
+    
+    <div id="tab1" class="tab-content active">
+        <h2>Tab 1 Content</h2>
+        <p>Este es el contenido del tab 1</p>
+    </div>
+    
+    <div id="tab2" class="tab-content">
+        <h2>Tab 2 Content</h2>
+        <p>Este es el contenido del tab 2</p>
+    </div>
+    
+    <script>
+        console.log('🔧 Test script loading...');
+        
+        function showTab(tabId) {
+            console.log('showTab called:', tabId);
+            
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active from buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabId).classList.add('active');
+            
+            // Highlight button
+            event.target.classList.add('active');
+            
+            console.log('Tab switched to:', tabId);
+        }
+        
+        function testAlert() {
+            alert('JavaScript funciona correctamente!');
+        }
+        
+        console.log('✅ Test script loaded');
+    </script>
+</body>
+</html>
