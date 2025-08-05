@@ -14,7 +14,7 @@
     "dist:linux": "npm run build-addon && electron-builder --linux"
   },
   "devDependencies": {
-    "electron": "^28.3.3",
+    "electron": "^37.2.5",
     "electron-builder": "^26.0.12",
     "node-gyp": "^10.3.1"
   },
