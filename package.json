@@ -22,7 +22,7 @@
     "@anthropic-ai/sdk": "^0.57.0",
     "dotenv": "^17.2.1",
     "flac-metadata": "^0.1.1",
-    "music-metadata": "^11.7.3",
+    "music-metadata": "^11.8.2",
     "node-addon-api": "^7.0.0",
     "node-id3": "^0.2.9",
     "sqlite3": "^5.1.7"
